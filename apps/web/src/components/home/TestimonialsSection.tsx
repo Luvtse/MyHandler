@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Star } from 'lucide-react';
 
 interface TestimonialProps {
   quote: string;
@@ -10,19 +11,19 @@ interface TestimonialProps {
 
 const Testimonial = ({ quote, author, company, image }: TestimonialProps) => {
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-      <div className="flex items-start mb-4">
-        <svg className="h-10 w-10 text-brand-300 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 32 32">
-          <path d="M9.352 4C4.456 7.456 1 13.12 1 19.36c0 5.088 3.072 8.064 6.624 8.064 3.36 0 5.856-2.688 5.856-5.856 0-3.168-2.208-5.472-5.088-5.472-.576 0-1.344.096-1.536.192.48-3.264 3.552-7.104 6.624-9.024L9.352 4zm16.512 0c-4.8 3.456-8.256 9.12-8.256 15.36 0 5.088 3.072 8.064 6.624 8.064 3.264 0 5.856-2.688 5.856-5.856 0-3.168-2.304-5.472-5.184-5.472-.576 0-1.248.096-1.44.192.48-3.264 3.456-7.104 6.528-9.024L25.864 4z" />
-        </svg>
-        <p className="text-gray-700 italic">{quote}</p>
+    <div className="flex flex-col h-full rounded-2xl bg-white p-8 border border-gray-100 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand/5">
+      <div className="mb-4 flex gap-1" aria-label="Rated 5 out of 5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Star key={i} className="h-5 w-5 fill-brand-yellow text-brand-yellow" />
+        ))}
       </div>
-      
-      <div className="flex items-center">
-        <img 
-          src={image} 
-          alt={author} 
-          className="h-12 w-12 rounded-full mr-4 object-cover" 
+      <p className="text-gray-700 leading-relaxed flex-grow text-pretty">&ldquo;{quote}&rdquo;</p>
+
+      <div className="mt-6 flex items-center border-t border-gray-100 pt-5">
+        <img
+          src={image}
+          alt={author}
+          className="h-12 w-12 rounded-full mr-4 object-cover ring-2 ring-brand-50"
         />
         <div>
           <p className="font-semibold text-gray-900">{author}</p>
@@ -35,16 +36,17 @@ const Testimonial = ({ quote, author, company, image }: TestimonialProps) => {
 
 const TestimonialsSection = () => {
   return (
-    <section className="py-16 bg-brand-50">
+    <section className="py-20 bg-brand-50">
       <div className="logistics-container">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900">What Our Customers Say</h2>
-          <p className="text-gray-600 mt-2 max-w-2xl mx-auto">
-            Don't just take our word for it. Here's what our customers have to say about our services.
+        <div className="text-center mb-14 max-w-2xl mx-auto">
+          <span className="badge-blue mb-4 inline-block">Testimonials</span>
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 text-balance">What our customers say</h2>
+          <p className="text-gray-500 mt-4 text-lg text-pretty">
+            Don&apos;t just take our word for it. Here&apos;s what our customers have to say about our services.
           </p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Testimonial 
             quote="GoodsHandler has transformed how we handle our shipping needs. Their tracking system is incredibly reliable, and deliveries are always on time."
             author="Sarah Johnson"

@@ -13,22 +13,21 @@ const PartnersSection = () => {
   ];
 
   return (
-    <section className="py-12 bg-white">
+    <section className="py-16 bg-white border-y border-gray-100">
       <div className="logistics-container">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl font-bold text-gray-900">With Us</h2>
-          <p className="mt-4 text-lg text-gray-600">
-            Trusted by leading companies around the world
-          </p>
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 items-center justify-items-center">
+        <p className="text-center text-sm font-semibold uppercase tracking-widest text-gray-400 mb-10">
+          Trusted by leading companies around the world
+        </p>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 items-center justify-items-center">
           {partners.map((partner) => (
-            <div key={partner.name} className="flex items-center justify-center h-16">
-              {/* In a real app, replace with actual logo images */}
-              <div className="bg-gray-100 rounded-lg px-6 py-3 flex items-center justify-center min-w-32">
-                <span className="text-gray-600 font-semibold">{partner.name}</span>
-              </div>
+            <div
+              key={partner.name}
+              className="flex h-14 w-full items-center justify-center rounded-xl border border-transparent transition-colors hover:border-gray-100 hover:bg-gray-50"
+            >
+              <span className="text-lg font-bold tracking-tight text-gray-400 grayscale transition-all hover:text-brand hover:grayscale-0">
+                {partner.name}
+              </span>
             </div>
           ))}
         </div>

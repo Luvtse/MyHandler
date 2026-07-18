@@ -48,42 +48,41 @@ const Header = () => {
     }
   };
 
+  const navLinks = [
+    { to: '/tracking', label: 'Track', icon: Search },
+    { to: '/create-shipment', label: 'Ship', icon: Package },
+    { to: '/schedule-pickup', label: 'Schedule Pickup', icon: Truck },
+    { to: '/locations', label: 'Locations', icon: MapPin },
+    { to: '/support', label: 'Support', icon: Clock },
+  ];
+
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+    <header className="bg-white/90 backdrop-blur-md border-b border-gray-200/80 sticky top-0 z-40 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
       <div className="logistics-container">
-        <div className="flex justify-between items-center py-2">
+        <div className="flex justify-between items-center h-20">
           <div className="flex items-center">
-            <Link to="/">
+            <Link to="/" className="shrink-0">
               <img 
                 src="/logo.png" 
                 alt="GoodsHandler Logo" 
-                className="h-16 w-auto" 
+                className="h-14 w-auto" 
               />
             </Link>
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <Link to="/tracking" className="flex items-center text-gray-700 hover:text-brand transition-colors">
-              <Search className="h-5 w-5 mr-1" />
-              <span>Track</span>
-            </Link>
-            <Link to="/create-shipment" className="flex items-center text-gray-700 hover:text-brand transition-colors">
-              <Package className="h-5 w-5 mr-1" />
-              <span>Ship</span>
-            </Link>
-            <Link to="/schedule-pickup" className="flex items-center text-gray-700 hover:text-brand transition-colors">
-              <Truck className="h-5 w-5 mr-1" />
-              <span>Schedule Pickup</span>
-            </Link>
-            <Link to="/locations" className="flex items-center text-gray-700 hover:text-brand transition-colors">
-              <MapPin className="h-5 w-5 mr-1" />
-              <span>Locations</span>
-            </Link>
-            <Link to="/support" className="flex items-center text-gray-700 hover:text-brand transition-colors">
-              <Clock className="h-5 w-5 mr-1" />
-              <span>Support</span>
-            </Link>
+          <nav className="hidden md:flex items-center gap-1">
+            {navLinks.map(({ to, label, icon: Icon }) => (
+              <Link
+                key={to}
+                to={to}
+                className="group relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:text-brand transition-colors rounded-md"
+              >
+                <Icon className="h-4 w-4 text-gray-400 group-hover:text-brand transition-colors" />
+                <span>{label}</span>
+                <span className="absolute inset-x-3 -bottom-px h-0.5 origin-left scale-x-0 bg-brand-yellow transition-transform duration-200 group-hover:scale-x-100" />
+              </Link>
+            ))}
           </nav>
 
           <div className="hidden md:flex items-center space-x-3">
@@ -129,13 +128,13 @@ const Header = () => {
             ) : (
               <>
                 <Link to="/login">
-                  <Button variant="outline" size="sm" className="flex items-center">
+                  <Button variant="ghost" size="sm" className="flex items-center font-medium text-gray-700 hover:text-brand hover:bg-brand-50">
                     <User className="h-4 w-4 mr-2" />
                     Login
                   </Button>
                 </Link>
                 <Link to="/register">
-                  <Button size="sm" className="bg-brand hover:bg-brand-600">Register</Button>
+                  <Button size="sm" className="bg-brand hover:bg-brand-600 shadow-sm font-semibold px-5">Get Started</Button>
                 </Link>
               </>
             )}
