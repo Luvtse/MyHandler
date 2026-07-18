@@ -138,43 +138,47 @@ const Tracking = () => {
 
   return (
     <MainLayout>
-      <section className="py-10 bg-gray-50">
+      <section className="py-10 md:py-12 bg-muted min-h-[70vh]">
         <div className="logistics-container">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-            <h1 className="page-header mb-4 sm:mb-0">Track Your Shipment</h1>
-            <Button 
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Track Your Shipment</h1>
+              <p className="text-gray-500 mt-1">Real-time visibility from pickup to delivery.</p>
+            </div>
+            <Button
               onClick={handleCreateShipment}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-brand hover:bg-brand-600 font-semibold shrink-0"
             >
               <Package className="h-4 w-4" />
               Create Shipment
             </Button>
           </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
             <div className="lg:col-span-4">
               <TrackingForm onSubmit={handleSubmit} />
             </div>
-            
+
             <div className="lg:col-span-8">
               {(isLoading || localLoading) ? (
-                <div className="flex justify-center items-center min-h-[400px]">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand" />
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-center items-center min-h-[420px] gap-4">
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-brand-100 border-t-brand" />
+                  <p className="text-gray-500 text-sm">Fetching tracking information…</p>
                 </div>
               ) : shipment ? (
-                <ShipmentDetails 
-                  shipment={shipment} 
+                <ShipmentDetails
+                  shipment={shipment}
                   trackingNumber={trackingNumber || undefined}
                   onStatusUpdate={handleStatusUpdate}
                 />
               ) : (
-                <div className="bg-white rounded-lg shadow-md p-6 md:p-12 border border-gray-100 flex flex-col items-center text-center">
-                  <div className="bg-gray-100 rounded-full p-6 mb-4">
-                    <Search className="h-12 w-12 text-gray-400" />
+                <div className="bg-white rounded-2xl shadow-sm p-8 md:p-14 border border-gray-100 flex flex-col items-center text-center min-h-[420px] justify-center">
+                  <div className="bg-brand-50 rounded-2xl p-6 mb-5">
+                    <Search className="h-12 w-12 text-brand" />
                   </div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-2">Enter a tracking number to begin</h2>
-                  <p className="text-gray-600 max-w-md">
-                    Enter your GoodsHandler tracking number above to get detailed information about your shipment status.
+                  <h2 className="text-xl font-bold text-gray-900 mb-2">Enter a tracking number to begin</h2>
+                  <p className="text-gray-500 max-w-md leading-relaxed">
+                    Enter your GoodsHandler tracking number to get detailed information about your shipment status and location.
                   </p>
                 </div>
               )}
