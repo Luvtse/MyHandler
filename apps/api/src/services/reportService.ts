@@ -156,7 +156,7 @@ class ReportService {
     } else if (filters.format === 'csv') {
       return this.generateCsvReport(reportData);
     } else {
-      throw new Error('PDF format not implemented yet');
+      return this.generatePdfReport('Shipment Report', reportData);
     }
   }
 
@@ -230,7 +230,7 @@ class ReportService {
     } else if (filters.format === 'csv') {
       return this.generateCsvReport(reportData);
     } else {
-      throw new Error('PDF format not implemented yet');
+      return this.generatePdfReport('Financial Report', reportData);
     }
   }
 
@@ -317,7 +317,7 @@ class ReportService {
     } else if (filters.format === 'csv') {
       return this.generateCsvReport(reportData);
     } else {
-      throw new Error('PDF format not implemented yet');
+      return this.generatePdfReport('Performance Report', reportData);
     }
   }
 
@@ -375,7 +375,7 @@ class ReportService {
     } else if (filters.format === 'csv') {
       return this.generateCsvReport(reportData);
     } else {
-      throw new Error('PDF format not implemented yet');
+      return this.generatePdfReport('Customer Report', reportData);
     }
   }
 
@@ -431,7 +431,7 @@ class ReportService {
     } else if (filters.format === 'csv') {
       return this.generateCsvReport(reportData);
     } else {
-      throw new Error('PDF format not implemented yet');
+      return this.generatePdfReport('Leave Report', reportData);
     }
   }
 
@@ -491,6 +491,148 @@ class ReportService {
     const json2csvParser = new Parser();
     const csv = json2csvParser.parse(data);
     return Buffer.from(csv, 'utf-8');
+  }
+
+  /**
+   * Generate a valid PDF report without external dependencies.
+   * Uses PDF 1.4 syntax with built-in Helvetica/Helvetica-Bold fonts.
+   */
+  private generatePdfReport(title: string, data: any[]): Buffer {
+    const MARGIN = 40;
+    const PAGE_W = 612;
+    const PAGE_H = 792;
+    const ROW_H = 16;
+    const HEADER_H = 18;
+    const TOP_Y = PAGE_H - MARGIN - 30; // first content y-position
+
+    const headers = data.length > 0 ? Object.keys(data[0]) : [];
+    const colW = headers.length > 0 ? Math.floor((PAGE_W - MARGIN * 2) / headers.length) : PAGE_W - MARGIN * 2;
+
+    // Escape PDF string special characters
+    const esc = (s: string) =>
+      String(s)
+        .replace(/\\/g, '\\\\')
+        .replace(/\(/g, '\\(')
+        .replace(/\)/g, '\\)')
+        .slice(0, 60); // truncate long cells
+
+    // Build all page content streams
+    const pages: string[] = [];
+    let currentLines: string[] = [];
+    let y = TOP_Y;
+
+    const newPage = () => {
+      if (currentLines.length > 0) pages.push(currentLines.join('\n'));
+      currentLines = [];
+      y = TOP_Y;
+      // Title on every page
+      currentLines.push(
+        'BT',
+        '/FB 14 Tf',
+        `${MARGIN} ${PAGE_H - MARGIN - 14} Td`,
+        `(${esc(title)}) Tj`,
+        'ET',
+      );
+      // Column headers
+      currentLines.push('BT', '/FB 9 Tf');
+      headers.forEach((h, i) => {
+        currentLines.push(`${MARGIN + i * colW} ${y} Td`, `(${esc(this.camelCaseToTitleCase(h))}) Tj`);
+        if (i < headers.length - 1) currentLines.push(`${-(MARGIN + i * colW)} 0 Td`);
+      });
+      currentLines.push('ET');
+      y -= HEADER_H;
+      // Separator line
+      currentLines.push(
+        `${MARGIN} ${y + 4} m`,
+        `${PAGE_W - MARGIN} ${y + 4} l`,
+        '0.5 w S',
+      );
+    };
+
+    newPage();
+
+    // Data rows
+    for (const row of data) {
+      if (y < MARGIN + ROW_H) newPage();
+      currentLines.push('BT', '/F1 8 Tf');
+      const vals = Object.values(row);
+      vals.forEach((v: any, i) => {
+        currentLines.push(`${MARGIN + i * colW} ${y} Td`, `(${esc(String(v ?? ''))}) Tj`);
+        if (i < vals.length - 1) currentLines.push(`${-(MARGIN + i * colW)} 0 Td`);
+      });
+      currentLines.push('ET');
+      y -= ROW_H;
+    }
+    pages.push(currentLines.join('\n'));
+
+    if (data.length === 0) {
+      pages[0] = (pages[0] ?? '') + '\nBT\n/F1 10 Tf\n' + `${MARGIN} ${TOP_Y - 30} Td\n(No data available) Tj\nET`;
+    }
+
+    // ── Build PDF binary ────────────────────────────────────────────────────────
+    const objects: { id: number; content: string }[] = [];
+    let nextId = 1;
+
+    const addObj = (content: string) => {
+      const id = nextId++;
+      objects.push({ id, content });
+      return id;
+    };
+
+    // Font objects
+    const fontRegId = addObj('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+    const fontBoldId = addObj('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+
+    // Resources object
+    const resId = addObj(`<< /Font << /F1 ${fontRegId} 0 R /FB ${fontBoldId} 0 R >> >>`);
+
+    // Page content streams + page objects
+    const pageIds: number[] = [];
+    for (const stream of pages) {
+      const streamBytes = Buffer.from(stream, 'latin1');
+      const contentId = addObj(`<< /Length ${streamBytes.length} >>\nstream\n${stream}\nendstream`);
+      const pageId = addObj(
+        `<< /Type /Page /Parent 0 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Contents ${contentId} 0 R /Resources ${resId} 0 R >>`,
+      );
+      pageIds.push(pageId);
+    }
+
+    // Pages dict (we'll replace parent refs)
+    const pagesId = addObj(
+      `<< /Type /Pages /Kids [${pageIds.map(id => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`,
+    );
+
+    // Fix parent reference in each page object
+    objects.forEach(o => {
+      if (o.content.includes('/Type /Page ')) {
+        o.content = o.content.replace('/Parent 0 0 R', `/Parent ${pagesId} 0 R`);
+      }
+    });
+
+    // Catalog
+    const catalogId = addObj(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+
+    // ── Serialise ───────────────────────────────────────────────────────────────
+    const lines: string[] = ['%PDF-1.4', '%\u00e2\u00e3\u00cf\u00d3'];
+    const offsets: number[] = new Array(nextId).fill(0);
+
+    for (const { id, content } of objects) {
+      offsets[id] = lines.join('\n').length + 1; // +1 for newline
+      lines.push(`${id} 0 obj\n${content}\nendobj`);
+    }
+
+    const xrefOffset = lines.join('\n').length + 1;
+
+    lines.push('xref');
+    lines.push(`0 ${nextId}`);
+    lines.push('0000000000 65535 f ');
+    for (let i = 1; i < nextId; i++) {
+      lines.push(String(offsets[i]).padStart(10, '0') + ' 00000 n ');
+    }
+    lines.push(`trailer\n<< /Size ${nextId} /Root ${catalogId} 0 R >>`);
+    lines.push(`startxref\n${xrefOffset}\n%%EOF`);
+
+    return Buffer.from(lines.join('\n'), 'latin1');
   }
 
   /**

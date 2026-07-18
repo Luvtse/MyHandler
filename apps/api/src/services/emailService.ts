@@ -10,20 +10,77 @@ interface EmailOptions {
   html?: string;
 }
 
-interface EmailTemplate {
-  subject: string;
-  text: string;
-  html: string;
+interface EmailTemplate { subject: string; text: string; html: string }
+
+// ─── Brand helpers ────────────────────────────────────────────────────────────
+
+const BRAND_BLUE = '#1A3C8F';
+const BRAND_YELLOW = '#FFC107';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://goodshandler.com';
+
+function header(title: string): string {
+  return `
+  <div style="background:${BRAND_BLUE};padding:24px 32px;border-radius:8px 8px 0 0;">
+    <h1 style="color:#fff;margin:0;font-family:Inter,Arial,sans-serif;font-size:20px;font-weight:700;">
+      GoodsHandler
+    </h1>
+    <p style="color:#CBD5F0;margin:4px 0 0;font-family:Inter,Arial,sans-serif;font-size:13px;">
+      ${title}
+    </p>
+  </div>`;
 }
+
+function footer(): string {
+  return `
+  <div style="background:#F8FAFC;border-top:1px solid #E2E8F0;padding:16px 32px;border-radius:0 0 8px 8px;">
+    <p style="color:#94A3B8;font-family:Inter,Arial,sans-serif;font-size:12px;margin:0;text-align:center;">
+      © ${new Date().getFullYear()} GoodsHandler &nbsp;·&nbsp;
+      <a href="${FRONTEND_URL}/terms" style="color:#94A3B8;">Terms</a>
+      &nbsp;·&nbsp;
+      <a href="${FRONTEND_URL}/support" style="color:#94A3B8;">Support</a>
+    </p>
+  </div>`;
+}
+
+function card(content: string): string {
+  return `
+  <div style="background:#fff;padding:24px 32px;border:1px solid #E2E8F0;">
+    ${content}
+  </div>`;
+}
+
+function pill(label: string, color: string): string {
+  return `<span style="background:${color};color:#fff;border-radius:999px;padding:3px 12px;font-size:12px;font-weight:600;">${label}</span>`;
+}
+
+function cta(text: string, url: string): string {
+  return `<a href="${url}" style="display:inline-block;background:${BRAND_BLUE};color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;margin-top:20px;">${text}</a>`;
+}
+
+function wrap(title: string, body: string): string {
+  return `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+  <body style="margin:0;background:#F1F5F9;padding:32px 0;">
+    <div style="max-width:560px;margin:0 auto;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+      ${header(title)}
+      ${card(body)}
+      ${footer()}
+    </div>
+  </body>
+  </html>`;
+}
+
+// ─── EmailService ─────────────────────────────────────────────────────────────
 
 class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    // Create transporter using environment variables
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587'),
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
       secure: false,
       auth: {
         user: process.env.SMTP_USER,
@@ -32,161 +89,178 @@ class EmailService {
     });
   }
 
-  /**
-   * Send email
-   */
   async sendEmail(options: EmailOptions): Promise<void> {
     try {
       await this.transporter.sendMail({
-        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        from: `"GoodsHandler" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
         ...options,
       });
-      console.log('Email sent successfully to:', options.to);
+      console.log('[Email] Sent to:', options.to, '|', options.subject);
     } catch (error) {
-      console.error('Error sending email:', error);
+      console.error('[Email] Failed:', error);
       throw error;
     }
   }
 
   /**
-   * Send notification email based on type
+   * Send a typed notification email to a user.
+   * Looks up user email from DB, picks the right template, and logs the result.
    */
   async sendNotificationEmail(userId: string, type: string, data: any): Promise<void> {
+    let userEmail = 'unknown';
+    let userName = '';
     try {
-      // Get user email preferences
       const user = await prisma.user.findUnique({
         where: { id: userId },
         select: { email: true, name: true },
       });
-
-      if (!user || !user.email) {
-        console.log('User not found or no email address');
+      if (!user?.email) {
+        console.log('[Email] No email for user:', userId);
         return;
       }
+      userEmail = user.email;
+      userName = user.name ?? 'Customer';
 
-      // Check if user has enabled email notifications for this type
-      // For now, we'll assume all notifications are enabled
-      // TODO: Add emailPreferences field to User model or use a separate preferences table
-
-      // Get email template
-      const template = this.getEmailTemplate(type, data, user.name);
+      const template = this.getEmailTemplate(type, data, userName);
       if (!template) {
-        console.log(`No email template found for type: ${type}`);
+        console.log('[Email] No template for type:', type);
         return;
       }
 
-      await this.sendEmail({
-        to: user.email,
-        subject: template.subject,
-        text: template.text,
-        html: template.html,
-      });
+      await this.sendEmail({ to: userEmail, subject: template.subject, html: template.html, text: template.text });
 
-      // Log email sent
-      await (prisma as any).emailLog.create({
-        data: {
-          userId,
-          type,
-          recipient: user.email,
-          subject: template.subject,
-          status: 'SENT',
-        },
-      });
+      await this.logEmail(userId, type, userEmail, template.subject, 'SENT');
     } catch (error) {
-      console.error('Error sending notification email:', error);
-      
-      // Log email failure
-      await (prisma as any).emailLog.create({
-        data: {
-          userId,
-          type,
-          recipient: 'unknown',
-          subject: `Email notification: ${type}`,
-          status: 'FAILED',
-          error: error instanceof Error ? error.message : 'Unknown error',
-        },
-      });
+      console.error('[Email] sendNotificationEmail error:', error);
+      await this.logEmail(userId, type, userEmail, `Email: ${type}`, 'FAILED', error);
     }
   }
 
-  /**
-   * Get email template based on notification type
-   */
+  private async logEmail(
+    userId: string,
+    type: string,
+    recipient: string,
+    subject: string,
+    status: string,
+    error?: any,
+  ) {
+    try {
+      await (prisma as any).emailLog.create({
+        data: {
+          userId,
+          type,
+          recipient,
+          subject,
+          status,
+          error: error instanceof Error ? error.message : error ? String(error) : null,
+        },
+      });
+    } catch { /* swallow – logging should never break */ }
+  }
+
+  // ─── Templates ──────────────────────────────────────────────────────────────
+
   private getEmailTemplate(type: string, data: any, userName: string): EmailTemplate | null {
     const templates: Record<string, EmailTemplate> = {
-      'LEAVE_REQUEST': {
+
+      // ── Shipment created ────────────────────────────────────────────────────
+      SHIPMENT_CREATED: {
+        subject: `Shipment Booked – ${data.reference || 'AWB Ready'}`,
+        text: `Hi ${userName},\n\nYour shipment ${data.reference} has been created.\nOrigin: ${data.origin}\nDestination: ${data.destination}\nService: ${data.serviceType || 'Standard'}\n\nTrack it at ${FRONTEND_URL}/tracking\n\n– GoodsHandler`,
+        html: wrap(
+          'Shipment Created',
+          `<p style="font-family:Inter,Arial,sans-serif;color:#0F172A;margin:0 0 16px;">Hi <strong>${userName}</strong>,</p>
+          <p style="font-family:Inter,Arial,sans-serif;color:#475569;margin:0 0 20px;line-height:1.6;">Your shipment has been booked and an Air Waybill has been generated.</p>
+          <table style="width:100%;border-collapse:collapse;font-family:Inter,Arial,sans-serif;font-size:14px;">
+            <tr><td style="padding:8px 0;color:#64748B;width:40%;">AWB / Reference</td><td style="padding:8px 0;color:#0F172A;font-weight:600;font-family:monospace;letter-spacing:.05em;">${data.reference || '—'}</td></tr>
+            <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Origin</td><td style="padding:8px 0;color:#0F172A;">${data.origin || '—'}</td></tr>
+            <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Destination</td><td style="padding:8px 0;color:#0F172A;">${data.destination || '—'}</td></tr>
+            <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Service</td><td style="padding:8px 0;color:#0F172A;">${data.serviceType || 'Standard'}</td></tr>
+            <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Status</td><td style="padding:8px 0;">${pill('Order Received', BRAND_BLUE)}</td></tr>
+          </table>
+          ${cta('Track Your Shipment', `${FRONTEND_URL}/tracking?awb=${data.reference}`)}
+          <p style="font-family:Inter,Arial,sans-serif;color:#94A3B8;font-size:12px;margin-top:24px;">Questions? Reply to this email or visit our <a href="${FRONTEND_URL}/support" style="color:${BRAND_BLUE};">Support Centre</a>.</p>`,
+        ),
+      },
+
+      // ── Shipment delivered ──────────────────────────────────────────────────
+      SHIPMENT_DELIVERED: {
+        subject: `Delivered ✓ – ${data.reference || 'Your Shipment'}`,
+        text: `Hi ${userName},\n\nGreat news! Your shipment ${data.reference} has been delivered.\nDelivered to: ${data.destination}\nDelivery time: ${data.deliveredAt || 'N/A'}\n\nThank you for choosing GoodsHandler.\n– GoodsHandler`,
+        html: wrap(
+          'Shipment Delivered',
+          `<p style="font-family:Inter,Arial,sans-serif;color:#0F172A;margin:0 0 16px;">Hi <strong>${userName}</strong>,</p>
+          <p style="font-family:Inter,Arial,sans-serif;color:#475569;margin:0 0 20px;line-height:1.6;">
+            Great news! Your shipment has been successfully delivered. 🎉
+          </p>
+          <table style="width:100%;border-collapse:collapse;font-family:Inter,Arial,sans-serif;font-size:14px;">
+            <tr><td style="padding:8px 0;color:#64748B;width:40%;">AWB / Reference</td><td style="padding:8px 0;color:#0F172A;font-weight:600;font-family:monospace;letter-spacing:.05em;">${data.reference || '—'}</td></tr>
+            <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Delivered To</td><td style="padding:8px 0;color:#0F172A;">${data.destination || '—'}</td></tr>
+            <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Delivery Time</td><td style="padding:8px 0;color:#0F172A;">${data.deliveredAt || '—'}</td></tr>
+            <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Status</td><td style="padding:8px 0;">${pill('Delivered', '#16A34A')}</td></tr>
+          </table>
+          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:16px;margin-top:20px;">
+            <p style="font-family:Inter,Arial,sans-serif;color:#15803D;font-size:14px;margin:0;font-weight:600;">Thank you for choosing GoodsHandler!</p>
+            <p style="font-family:Inter,Arial,sans-serif;color:#16A34A;font-size:13px;margin:6px 0 0;">Fast. Reliable. Affordable.</p>
+          </div>
+          ${cta('View Shipment Details', `${FRONTEND_URL}/tracking?awb=${data.reference}`)}`,
+        ),
+      },
+
+      // ── Existing: Leave request ─────────────────────────────────────────────
+      LEAVE_REQUEST: {
         subject: 'New Leave Request',
-        text: `Hello ${userName},\n\nA new leave request has been submitted and requires your review.\n\nLeave Type: ${data.leaveType}\nDuration: ${data.duration} days\nEmployee: ${data.employeeName}\n\nPlease log in to review the request.`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">New Leave Request</h2>
-            <p>Hello ${userName},</p>
-            <p>A new leave request has been submitted and requires your review.</p>
-            <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <p><strong>Leave Type:</strong> ${data.leaveType}</p>
-              <p><strong>Duration:</strong> ${data.duration} days</p>
-              <p><strong>Employee:</strong> ${data.employeeName}</p>
-            </div>
-            <p>Please log in to review the request.</p>
-            <a href="${process.env.FRONTEND_URL}/hr/leave-management" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Review Leave Request</a>
-          </div>
-        `
+        text: `Hi ${userName},\n\nA new leave request requires your review.\nType: ${data.leaveType}\nDuration: ${data.duration} days\nEmployee: ${data.employeeName}\n\nPlease log in to review.`,
+        html: wrap(
+          'New Leave Request',
+          `<p style="font-family:Inter,Arial,sans-serif;color:#0F172A;">Hi <strong>${userName}</strong>,</p>
+          <p style="font-family:Inter,Arial,sans-serif;color:#475569;">A new leave request requires your review.</p>
+          <table style="width:100%;border-collapse:collapse;font-family:Inter,Arial,sans-serif;font-size:14px;">
+            <tr><td style="padding:8px 0;color:#64748B;width:40%;">Leave Type</td><td style="padding:8px 0;color:#0F172A;">${data.leaveType}</td></tr>
+            <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Duration</td><td style="padding:8px 0;color:#0F172A;">${data.duration} days</td></tr>
+            <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Employee</td><td style="padding:8px 0;color:#0F172A;">${data.employeeName}</td></tr>
+            ${data.comments ? `<tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Comments</td><td style="padding:8px 0;color:#0F172A;">${data.comments}</td></tr>` : ''}
+          </table>
+          ${cta('Review Request', `${FRONTEND_URL}/leave`)}`,
+        ),
       },
-      'LEAVE_STATUS': {
-        subject: `Leave Request ${data.status}`,
-        text: `Hello ${userName},\n\nYour leave request has been ${data.status.toLowerCase()}.\n\nLeave Type: ${data.leaveType}\nDuration: ${data.duration} days\n${data.comments ? `Comments: ${data.comments}` : ''}\n\nPlease log in to view the details.`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: ${data.status === 'APPROVED' ? '#28a745' : '#dc3545'};">Leave Request ${data.status}</h2>
-            <p>Hello ${userName},</p>
-            <p>Your leave request has been ${data.status.toLowerCase()}.</p>
-            <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <p><strong>Leave Type:</strong> ${data.leaveType}</p>
-              <p><strong>Duration:</strong> ${data.duration} days</p>
-              ${data.comments ? `<p><strong>Comments:</strong> ${data.comments}</p>` : ''}
-            </div>
-            <a href="${process.env.FRONTEND_URL}/leave" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">View Leave Details</a>
-          </div>
-        `
-      },
-      'PAYOUT_REQUEST': {
+
+      // ── Existing: Payout request ────────────────────────────────────────────
+      PAYOUT_REQUEST: {
         subject: 'New Payout Request',
-        text: `Hello ${userName},\n\nA new payout request has been submitted and requires your review.\n\nAmount: ${data.amount} ${data.currency}\nPayment Method: ${data.paymentMethod}\nRequested by: ${data.requestedBy}\n\nPlease log in to review the request.`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">New Payout Request</h2>
-            <p>Hello ${userName},</p>
-            <p>A new payout request has been submitted and requires your review.</p>
-            <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <p><strong>Amount:</strong> ${data.amount} ${data.currency}</p>
-              <p><strong>Payment Method:</strong> ${data.paymentMethod}</p>
-              <p><strong>Requested by:</strong> ${data.requestedBy}</p>
-            </div>
-            <p>Please log in to review the request.</p>
-            <a href="${process.env.FRONTEND_URL}/finance/payout-requests" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Review Payout Request</a>
-          </div>
-        `
+        text: `Hi ${userName},\n\nA new payout request requires your review.\nAmount: ${data.amount} ${data.currency}\nMethod: ${data.paymentMethod}\nRequested by: ${data.requestedBy}`,
+        html: wrap(
+          'New Payout Request',
+          `<p style="font-family:Inter,Arial,sans-serif;color:#0F172A;">Hi <strong>${userName}</strong>,</p>
+          <p style="font-family:Inter,Arial,sans-serif;color:#475569;">A new payout request requires your review.</p>
+          <table style="width:100%;border-collapse:collapse;font-family:Inter,Arial,sans-serif;font-size:14px;">
+            <tr><td style="padding:8px 0;color:#64748B;width:40%;">Amount</td><td style="padding:8px 0;color:#0F172A;font-weight:600;">${data.amount} ${data.currency}</td></tr>
+            <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Method</td><td style="padding:8px 0;color:#0F172A;">${data.paymentMethod}</td></tr>
+            <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Requested By</td><td style="padding:8px 0;color:#0F172A;">${data.requestedBy}</td></tr>
+          </table>
+          ${cta('Review Payout', `${FRONTEND_URL}/finance/payout-requests`)}`,
+        ),
       },
-      'PAYOUT_STATUS': {
+
+      // ── Existing: Payout status ─────────────────────────────────────────────
+      PAYOUT_STATUS: {
         subject: `Payout Request ${data.status}`,
-        text: `Hello ${userName},\n\nYour payout request has been ${data.status.toLowerCase()}.\n\nAmount: ${data.amount} ${data.currency}\nPayment Method: ${data.paymentMethod}\n${data.notes ? `Notes: ${data.notes}` : ''}\n\nPlease log in to view the details.`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: ${data.status === 'APPROVED' || data.status === 'COMPLETED' ? '#28a745' : '#dc3545'};">Payout Request ${data.status}</h2>
-            <p>Hello ${userName},</p>
-            <p>Your payout request has been ${data.status.toLowerCase()}.</p>
-            <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <p><strong>Amount:</strong> ${data.amount} ${data.currency}</p>
-              <p><strong>Payment Method:</strong> ${data.paymentMethod}</p>
-              ${data.notes ? `<p><strong>Notes:</strong> ${data.notes}</p>` : ''}
-            </div>
-            <a href="${process.env.FRONTEND_URL}/finance/payout-requests" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">View Payout Details</a>
-          </div>
-        `
+        text: `Hi ${userName},\n\nYour payout request has been ${data.status?.toLowerCase()}.\nAmount: ${data.amount} ${data.currency}\nMethod: ${data.paymentMethod}${data.notes ? `\nNotes: ${data.notes}` : ''}`,
+        html: wrap(
+          `Payout ${data.status}`,
+          `<p style="font-family:Inter,Arial,sans-serif;color:#0F172A;">Hi <strong>${userName}</strong>,</p>
+          <p style="font-family:Inter,Arial,sans-serif;color:#475569;">Your payout request has been <strong>${data.status?.toLowerCase()}</strong>.</p>
+          <table style="width:100%;border-collapse:collapse;font-family:Inter,Arial,sans-serif;font-size:14px;">
+            <tr><td style="padding:8px 0;color:#64748B;width:40%;">Amount</td><td style="padding:8px 0;color:#0F172A;font-weight:600;">${data.amount} ${data.currency}</td></tr>
+            <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Method</td><td style="padding:8px 0;color:#0F172A;">${data.paymentMethod}</td></tr>
+            ${data.notes ? `<tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Notes</td><td style="padding:8px 0;color:#0F172A;">${data.notes}</td></tr>` : ''}
+          </table>
+          ${cta('View Details', `${FRONTEND_URL}/finance/payout-requests`)}`,
+        ),
       },
     };
 
-    return templates[type] || null;
+    return templates[type] ?? null;
   }
 }
 

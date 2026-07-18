@@ -1,396 +1,186 @@
-// @/dashboard/executive/ceo/CeoDashboard.tsx
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
-  TrendingUp,
-  Users,
-  DollarSign,
-  Package,
-  BarChart3,
-  Target,
-  Bot,
-  RefreshCw,
-  AlertCircle,
-  Zap,
-  CheckCircle,
+  TrendingUp, Users, DollarSign, Package, BarChart3, Target, Bot,
+  RefreshCw, AlertCircle, Zap, CheckCircle,
 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ResponsiveContainer, RadialBarChart, RadialBar, Tooltip } from 'recharts';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { useAuth } from '@/features/auth/hooks';
 import { toast } from 'sonner';
+import { getCeoData } from '@/services/executive';
+import type { CeoData, ExecutiveInsight, StrategicGoal } from '@/services/executive';
 
-// Types
-interface StrategicMetrics {
-  revenue: number; // ETB
-  ytdGrowth: number; // %
-  customerRetention: number; // %
-  netPromoterScore: number; // -100 to 100
-  onTimeDelivery: number; // %
-  operatingMargin: number; // %
-  totalClients: number;
-  activeShipments: number;
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmt(n: number) {
+  return n >= 1_000_000
+    ? `ETB ${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1_000
+    ? `ETB ${(n / 1_000).toFixed(0)}K`
+    : `ETB ${n.toLocaleString()}`;
 }
 
-interface StrategicInsight {
-  id: string;
-  title: string;
-  message: string;
-  confidence: number;
-  severity: 'low' | 'medium' | 'high';
-  recommendation: string;
-  source: 'finance' | 'operations' | 'marketing' | 'clients';
+function SeverityBadge({ severity }: { severity: ExecutiveInsight['severity'] }) {
+  const cls = { high: 'bg-red-100 text-red-700', medium: 'bg-amber-100 text-amber-700', low: 'bg-green-100 text-green-700' }[severity];
+  return <span className={`${cls} text-xs font-medium px-2 py-0.5 rounded-full capitalize`}>{severity}</span>;
 }
 
-interface StrategicGoal {
-  id: string;
-  title: string;
-  target: number;
-  current: number;
-  unit: string;
-  status: 'on_track' | 'at_risk' | 'off_track';
+function GoalCard({ goal }: { goal: StrategicGoal }) {
+  const pct = Math.min(100, Math.round((goal.current / goal.target) * 100));
+  const colors = { on_track: '#22C55E', at_risk: '#F59E0B', off_track: '#EF4444' };
+  const color = colors[goal.status];
+  return (
+    <div className="p-4 rounded-xl border border-gray-100 bg-gray-50 space-y-3">
+      <div className="flex justify-between items-center">
+        <span className="text-sm font-medium text-gray-700">{goal.title}</span>
+        <span className="text-xs font-semibold" style={{ color }}>{goal.status.replace('_', ' ')}</span>
+      </div>
+      <div>
+        <div className="flex justify-between text-xs text-gray-500 mb-1">
+          <span>{goal.unit === 'ETB' ? fmt(goal.current) : `${goal.current}${goal.unit}`}</span>
+          <span>{goal.unit === 'ETB' ? fmt(goal.target) : `${goal.target}${goal.unit}`}</span>
+        </div>
+        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+        </div>
+        <p className="text-xs text-gray-400 mt-1 text-right">{pct}% of target</p>
+      </div>
+    </div>
+  );
 }
 
-// Mock data
-const mockMetrics: StrategicMetrics = {
-  revenue: 8450000,
-  ytdGrowth: 24.3,
-  customerRetention: 88.2,
-  netPromoterScore: 72,
-  onTimeDelivery: 92.4,
-  operatingMargin: 14.8,
-  totalClients: 24,
-  activeShipments: 1420,
-};
+function InsightCard({ insight }: { insight: ExecutiveInsight }) {
+  const icons = { high: <AlertCircle className="h-4 w-4 text-red-500" />, medium: <Zap className="h-4 w-4 text-amber-500" />, low: <CheckCircle className="h-4 w-4 text-green-500" /> };
+  return (
+    <div className="p-4 rounded-xl border border-gray-100 bg-white space-y-2">
+      <div className="flex items-center gap-2">
+        {icons[insight.severity]}
+        <span className="text-sm font-semibold text-gray-800">{insight.title}</span>
+        <SeverityBadge severity={insight.severity} />
+        <span className="ml-auto text-xs text-gray-400">{Math.round(insight.confidence * 100)}% conf.</span>
+      </div>
+      <p className="text-sm text-gray-600">{insight.message}</p>
+      <p className="text-xs text-brand-700 font-medium bg-brand-50 rounded-lg px-3 py-1.5">💡 {insight.recommendation}</p>
+    </div>
+  );
+}
 
-const mockInsights: StrategicInsight[] = [
-  {
-    id: 'ins-01',
-    title: 'Revenue Growth at Risk',
-    message: 'Q1 growth slowed to 8% MoM (target: 12%) due to customs delays.',
-    confidence: 0.91,
-    severity: 'medium',
-    recommendation: 'Accelerate Djibouti port partnership to reduce clearance time.',
-    source: 'operations',
-  },
-  {
-    id: 'ins-02',
-    title: 'Client Retention Opportunity',
-    message: '3 enterprise clients show declining shipment volume.',
-    confidence: 0.87,
-    severity: 'medium',
-    recommendation: 'Assign Account Managers for proactive check-ins.',
-    source: 'clients',
-  },
-];
+function MetricCard({ title, value, sub, icon: Icon, loading }: { title: string; value: string; sub: string; icon: React.ElementType; loading: boolean }) {
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm text-gray-500">{title}</span>
+          <div className="p-2 bg-brand-50 rounded-lg"><Icon className="h-4 w-4 text-brand-600" /></div>
+        </div>
+        {loading ? <Skeleton className="h-8 w-32 mb-1" /> : <p className="text-2xl font-bold text-gray-900">{value}</p>}
+        <p className="text-xs text-gray-400 mt-1">{sub}</p>
+      </CardContent>
+    </Card>
+  );
+}
 
-const mockGoals: StrategicGoal[] = [
-  {
-    id: 'goal-01',
-    title: 'Annual Revenue Target',
-    target: 120000000,
-    current: 8450000,
-    unit: 'ETB',
-    status: 'on_track',
-  },
-  {
-    id: 'goal-02',
-    title: 'Client Retention Rate',
-    target: 90,
-    current: 88.2,
-    unit: '%',
-    status: 'at_risk',
-  },
-  {
-    id: 'goal-03',
-    title: 'On-Time Delivery',
-    target: 95,
-    current: 92.4,
-    unit: '%',
-    status: 'at_risk',
-  },
-];
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 
 const CeoDashboard = () => {
   const { user } = useAuth();
-  const [metrics] = useState<StrategicMetrics>(mockMetrics);
-  const [insights] = useState<StrategicInsight[]>(mockInsights);
-  const [goals] = useState<StrategicGoal[]>(mockGoals);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const qc = useQueryClient();
 
-  const refreshData = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      toast.success('Strategic data refreshed');
-    }, 600);
-  };
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<CeoData>({
+    queryKey: ['ceo-dashboard'],
+    queryFn: getCeoData,
+    staleTime: 2 * 60_000,
+    retry: 1,
+  });
 
-  useEffect(() => {
-    const interval = setInterval(refreshData, 300_000); // 5 mins
-    return () => clearInterval(interval);
-  }, []);
-
-  const getSeverityColor = (severity: StrategicInsight['severity']) => {
-    switch (severity) {
-      case 'high': return 'bg-destructive/10 border-destructive';
-      case 'medium': return 'bg-amber-50 border-amber-400';
-      default: return 'bg-blue-50 border-blue-400';
-    }
-  };
-
-  const getSourceIcon = (source: StrategicInsight['source']) => {
-    switch (source) {
-      case 'finance': return <DollarSign className="h-4 w-4" />;
-      case 'operations': return <Package className="h-4 w-4" />;
-      case 'marketing': return <BarChart3 className="h-4 w-4" />;
-      case 'clients': return <Users className="h-4 w-4" />;
-      default: return <Bot className="h-4 w-4" />;
-    }
-  };
-
-  const getStatusColor = (status: StrategicGoal['status']) => {
-    switch (status) {
-      case 'on_track': return 'text-green-500';
-      case 'at_risk': return 'text-yellow-500';
-      case 'off_track': return 'text-destructive';
-      default: return '';
-    }
-  };
-
-  const getStatusIcon = (status: StrategicGoal['status']) => {
-    switch (status) {
-      case 'on_track': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'at_risk': return <Zap className="h-4 w-4 text-yellow-500" />;
-      case 'off_track': return <AlertCircle className="h-4 w-4 text-destructive" />;
-      default: return null;
-    }
-  };
-
-  // Business Health Score (0-100)
-  const healthScore = Math.round(
-    (metrics.ytdGrowth / 30 * 25) +
-    (metrics.customerRetention / 100 * 25) +
-    (metrics.onTimeDelivery / 100 * 25) +
-    (metrics.operatingMargin / 20 * 25)
-  );
+  const m = data?.metrics;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">CEO Dashboard</h1>
-          <p className="text-muted-foreground">
-            Cross-functional strategic overview and business health
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900">CEO Strategic Dashboard</h1>
+          <p className="text-sm text-gray-500">Good morning, {user?.name ?? 'CEO'} · Live company performance</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={refreshData}
-          disabled={isRefreshing}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-2">
+          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>
 
-      {/* Business Health Score */}
-      <Card className="border-l-4 border-l-blue-500">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">Business Health Score</h2>
-              <p className="text-muted-foreground">Composite of growth, retention, ops, and finance</p>
-            </div>
-            <div className="text-right">
-              <div className="text-4xl font-bold">{healthScore}/100</div>
-              <Badge variant={healthScore > 80 ? 'default' : healthScore > 60 ? 'secondary' : 'destructive'}>
-                {healthScore > 80 ? 'Excellent' : healthScore > 60 ? 'Good' : 'Needs Attention'}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {isError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-red-700 text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          Failed to load dashboard data. <button className="underline ml-1" onClick={() => refetch()}>Retry</button>
+        </div>
+      )}
 
-      {/* AI Insights Banner */}
-      <div className="space-y-3">
-        {insights.map(insight => (
-          <Card key={insight.id} className={`border-l-4 ${getSeverityColor(insight.severity)}`}>
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                {getSourceIcon(insight.source)}
-                <div className="flex-1">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {insight.title}
-                    <Badge variant="secondary">Confidence: {Math.round(insight.confidence * 100)}%</Badge>
-                  </h3>
-                  <p className="mt-1 text-sm">{insight.message}</p>
-                  <p className="mt-2 text-sm font-medium text-primary">{insight.recommendation}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <MetricCard title="YTD Revenue" value={m ? fmt(m.revenue) : '—'} sub={m ? `${m.ytdGrowth >= 0 ? '+' : ''}${m.ytdGrowth}% vs last year` : 'Loading…'} icon={DollarSign} loading={isLoading} />
+        <MetricCard title="Client Retention" value={m ? `${m.customerRetention}%` : '—'} sub="Last 90 days vs prior 90 days" icon={Users} loading={isLoading} />
+        <MetricCard title="On-Time Delivery" value={m ? `${m.onTimeDelivery}%` : '—'} sub="YTD shipments delivered on time" icon={Package} loading={isLoading} />
+        <MetricCard title="Total Clients" value={m ? m.totalClients.toLocaleString() : '—'} sub={m ? `${m.activeShipments.toLocaleString()} active shipments` : 'Loading…'} icon={BarChart3} loading={isLoading} />
       </div>
 
-      {/* Core Strategic KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Revenue (MTD)</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+      {/* Revenue Chart + Goals */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Revenue Trend (Last 6 Months)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">ETB {metrics.revenue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+{metrics.ytdGrowth}% YTD</p>
+            {isLoading ? (
+              <Skeleton className="h-52 w-full" />
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={data?.revenueChart ?? []} barSize={32}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : `${(v / 1_000).toFixed(0)}K`} />
+                  <Tooltip formatter={(v: number) => [fmt(v), 'Revenue']} />
+                  <Bar dataKey="revenue" fill="#1A3C8F" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Customer Retention</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Target className="h-4 w-4 text-brand-600" /> Strategic Goals
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.customerRetention}%</div>
-            <p className="text-xs text-muted-foreground">Target: ≥90%</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">On-Time Delivery</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.onTimeDelivery}%</div>
-            <p className="text-xs text-muted-foreground">Target: ≥95%</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Operating Margin</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.operatingMargin}%</div>
-            <p className="text-xs text-muted-foreground">Target: ≥15%</p>
+          <CardContent className="space-y-3">
+            {isLoading ? (
+              [1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full" />)
+            ) : (
+              (data?.goals ?? []).map(g => <GoalCard key={g.id} goal={g} />)
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Strategic Goals */}
-      <Card>
+      {/* AI Insights */}
+      <Card className="border-0 shadow-sm">
         <CardHeader>
-          <CardTitle>Strategic Goal Progress</CardTitle>
-          <CardDescription>Key company objectives for 2026</CardDescription>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Bot className="h-4 w-4 text-brand-600" /> AI Strategic Insights
+          </CardTitle>
+          <CardDescription>Anomalies and recommendations computed from live company data</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {goals.map(goal => (
-              <div key={goal.id} className="border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium">{goal.title}</h3>
-                  {getStatusIcon(goal.status)}
-                </div>
-                <div className="text-2xl font-bold">
-                  {goal.current.toFixed(1)}{goal.unit}
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Target: {goal.target}{goal.unit}
-                </p>
-                <div className="mt-2 w-full bg-secondary h-2 rounded-full">
-                  <div 
-                    className={`h-2 rounded-full ${
-                      goal.status === 'on_track' ? 'bg-green-500' : 
-                      goal.status === 'at_risk' ? 'bg-yellow-500' : 'bg-destructive'
-                    }`} 
-                    style={{ width: `${Math.min(100, (goal.current / goal.target) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Cross-Functional Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalClients}</div>
-            <p className="text-xs text-muted-foreground">+2 this month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Shipments</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.activeShipments.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Today</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Promoter Score</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.netPromoterScore}</div>
-            <p className="text-xs text-muted-foreground">Industry avg: 50</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Executive Alerts</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">2</div>
-            <p className="text-xs text-muted-foreground">Requiring attention</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Links to Department Dashboards */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Department Performance</CardTitle>
-          <CardDescription>Drill down into functional areas</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button variant="outline" asChild>
-              <a href="/dashboard/cfo">
-                <DollarSign className="h-4 w-4 mr-2" />
-                CFO
-              </a>
-            </Button>
-            <Button variant="outline" asChild>
-              <a href="/dashboard/coo">
-                <Package className="h-4 w-4 mr-2" />
-                COO
-              </a>
-            </Button>
-            <Button variant="outline" asChild>
-              <a href="/dashboard/cmo">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                CMO
-              </a>
-            </Button>
-            <Button variant="outline" asChild>
-              <a href="/dashboard/account">
-                <Users className="h-4 w-4 mr-2" />
-                Account Mgmt
-              </a>
-            </Button>
-          </div>
+        <CardContent className="space-y-3">
+          {isLoading ? (
+            [1, 2].map(i => <Skeleton key={i} className="h-24 w-full" />)
+          ) : (
+            (data?.insights ?? []).map(ins => <InsightCard key={ins.id} insight={ins} />)
+          )}
         </CardContent>
       </Card>
     </div>

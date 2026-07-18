@@ -5,3 +5,35 @@ channel = "stable-25_05"
 
 [agent]
 expertMode = true
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "GoodsHandler API"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "GoodsHandler Web"
+
+[[workflows.workflow]]
+name = "GoodsHandler API"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd apps/api && npm run dev"
+
+[[workflows.workflow]]
+name = "GoodsHandler Web"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd apps/web && npm run dev -- --host 0.0.0.0 --port 5000"

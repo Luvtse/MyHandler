@@ -1,309 +1,183 @@
-// @/dashboard/executive/coo/CooDashboard.tsx
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
-  Package,
-  Truck,
-  Clock,
-  AlertTriangle,
-  MapPin,
-  TrendingUp,
-  Zap,
-  Bot,
-  RefreshCw,
-  DollarSign,
+  Package, Truck, Clock, AlertTriangle, TrendingUp,
+  Zap, Bot, RefreshCw, AlertCircle, CheckCircle, BarChart3,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { useAuth } from '@/features/auth/hooks';  
-import { toast } from 'sonner';
+import { useAuth } from '@/features/auth/hooks';
+import { getCooData } from '@/services/executive';
+import type { CooData, ExecutiveInsight } from '@/services/executive';
 
-// Types (defined later in types.ts)
-interface OperationalMetrics {
-  onTimeDeliveryRate: number;
-  avgFulfillmentTime: number; // hours
-  shipmentsProcessed: number;
-  activeVehicles: number;
-  fleetUtilization: number;
-  inventoryTurnover: number;
-  costPerShipment: number;
-  customsClearanceTime: number; // hours
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function InsightCard({ insight }: { insight: ExecutiveInsight }) {
+  const Icon = insight.severity === 'high' ? AlertCircle : insight.severity === 'medium' ? Zap : CheckCircle;
+  const cls = { high: 'text-red-500', medium: 'text-amber-500', low: 'text-green-500' }[insight.severity];
+  const bg = { high: 'border-red-100 bg-red-50/30', medium: 'border-amber-100 bg-amber-50/30', low: 'border-green-100 bg-green-50/30' }[insight.severity];
+  return (
+    <div className={`p-4 rounded-xl border ${bg} space-y-2`}>
+      <div className="flex items-center gap-2">
+        <Icon className={`h-4 w-4 ${cls}`} />
+        <span className="text-sm font-semibold text-gray-800">{insight.title}</span>
+        <span className="ml-auto text-xs text-gray-400">{Math.round(insight.confidence * 100)}% conf.</span>
+      </div>
+      <p className="text-sm text-gray-600">{insight.message}</p>
+      <p className="text-xs text-brand-700 font-medium bg-brand-50 rounded-lg px-3 py-1.5">💡 {insight.recommendation}</p>
+    </div>
+  );
 }
 
-interface OperationalInsight {
-  id: string;
-  title: string;
-  message: string;
-  confidence: number;
-  severity: 'low' | 'medium' | 'high';
-  recommendation: string;
+function KpiCard({ label, value, sub, icon: Icon, loading }: { label: string; value: string; sub: string; icon: React.ElementType; loading: boolean }) {
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm text-gray-500">{label}</span>
+          <div className="p-2 bg-brand-50 rounded-lg"><Icon className="h-4 w-4 text-brand-600" /></div>
+        </div>
+        {loading ? <Skeleton className="h-8 w-28 mb-1" /> : <p className="text-2xl font-bold text-gray-900">{value}</p>}
+        <p className="text-xs text-gray-400 mt-1">{sub}</p>
+      </CardContent>
+    </Card>
+  );
 }
 
-// Mock data (replace with API)
-const mockMetrics: OperationalMetrics = {
-  onTimeDeliveryRate: 92.4,
-  avgFulfillmentTime: 8.2,
-  shipmentsProcessed: 1420,
-  activeVehicles: 38,
-  fleetUtilization: 85.2,
-  inventoryTurnover: 12.4,
-  costPerShipment: 295.5,
-  customsClearanceTime: 14.3,
-};
-
-const mockInsights: OperationalInsight[] = [
-  {
-    id: 'ins-01',
-    title: 'Customs Delay Alert',
-    message: 'Customs clearance time at Djibouti port increased by 32% this week.',
-    confidence: 0.94,
-    severity: 'high',
-    recommendation: 'Reroute high-priority shipments via Berbera port or pre-clear documentation.',
-  },
-  {
-    id: 'ins-02',
-    title: 'Fleet Imbalance Detected',
-    message: 'Addis Ababa hub has 22% idle vehicles while Dire Dawa is at 98% capacity.',
-    confidence: 0.89,
-    severity: 'medium',
-    recommendation: 'Rebalance fleet allocation between hubs.',
-  },
-];
-
-const mockFulfillmentTrend = [
-  { day: 'Mon', time: 8.5 },
-  { day: 'Tue', time: 8.3 },
-  { day: 'Wed', time: 8.7 },
-  { day: 'Thu', time: 9.2 }, // spike
-  { day: 'Fri', time: 8.1 },
-  { day: 'Sat', time: 7.9 },
-  { day: 'Sun', time: 8.0 },
-];
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 
 const CooDashboard = () => {
   const { user } = useAuth();
-  const [metrics] = useState<OperationalMetrics>(mockMetrics);
-  const [insights] = useState<OperationalInsight[]>(mockInsights);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<CooData>({
+    queryKey: ['coo-dashboard'],
+    queryFn: getCooData,
+    staleTime: 2 * 60_000,
+    retry: 1,
+  });
 
-  const refreshData = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      toast.success('Operational data refreshed');
-    }, 600);
-  };
-
-  // Auto-refresh every 5 mins
-  useEffect(() => {
-    const interval = setInterval(refreshData, 300_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const getSeverityColor = (severity: OperationalInsight['severity']) => {
-    switch (severity) {
-      case 'high': return 'bg-destructive/10 border-destructive';
-      case 'medium': return 'bg-amber-50 border-amber-400';
-      default: return 'bg-blue-50 border-blue-400';
-    }
-  };
-
-  const getSeverityIcon = (severity: OperationalInsight['severity']) => {
-    switch (severity) {
-      case 'high': return <AlertTriangle className="h-4 w-4 text-destructive" />;
-      case 'medium': return <Zap className="h-4 w-4 text-amber-500" />;
-      default: return <Bot className="h-4 w-4 text-blue-500" />;
-    }
-  };
+  const m = data?.metrics;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">COO Dashboard</h1>
-          <p className="text-muted-foreground">
-            Real-time operational efficiency and supply chain health
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900">COO Operations Dashboard</h1>
+          <p className="text-sm text-gray-500">Good morning, {user?.name ?? 'COO'} · Live operational performance</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={refreshData}
-          disabled={isRefreshing}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-2">
+          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>
 
-      {/* AI Insights Banner */}
-      <div className="space-y-3">
-        {insights.map(insight => (
-          <Card key={insight.id} className={`border-l-4 ${getSeverityColor(insight.severity)}`}>
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                {getSeverityIcon(insight.severity)}
-                <div className="flex-1">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {insight.title}
-                    <Badge variant="secondary">Confidence: {Math.round(insight.confidence * 100)}%</Badge>
-                  </h3>
-                  <p className="mt-1 text-sm">{insight.message}</p>
-                  <p className="mt-2 text-sm font-medium text-primary">{insight.recommendation}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Core Operational KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">On-Time Delivery</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.onTimeDeliveryRate}%</div>
-            <p className="text-xs text-muted-foreground">Target: ≥95%</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Fulfillment Time</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.avgFulfillmentTime}h</div>
-            <p className="text-xs text-muted-foreground">-0.3h vs last week</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Fleet Utilization</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.fleetUtilization}%</div>
-            <p className="text-xs text-muted-foreground">38 active vehicles</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cost per Shipment</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">ETB {metrics.costPerShipment}</div>
-            <p className="text-xs text-muted-foreground">-ETB 12 vs last month</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Secondary Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Fulfillment Trend</CardTitle>
-            <CardDescription>Avg. time (hours) over last 7 days</CardDescription>
-          </CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={mockFulfillmentTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="day" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#0f172a', 
-                    borderColor: '#334155' 
-                  }} 
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="time" 
-                  stroke="#38bdf8" 
-                  strokeWidth={2}
-                  dot={{ r: 4 }}
-                  activeDot={{ r: 6, stroke: '#0ea5e9' }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Customs Performance</CardTitle>
-            <CardDescription>Clearance time by port</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span>Djibouti</span>
-                  <span className="font-medium">{metrics.customsClearanceTime}h</span>
-                </div>
-                <div className="w-full bg-secondary h-2 rounded-full">
-                  <div 
-                    className="bg-destructive h-2 rounded-full" 
-                    style={{ width: `${Math.min(100, (metrics.customsClearanceTime / 24) * 100)}%` }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span>Berbera</span>
-                  <span className="font-medium">9.2h</span>
-                </div>
-                <div className="w-full bg-secondary h-2 rounded-full">
-                  <div className="bg-green-500 h-2 rounded-full" style={{ width: '38%' }} />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Inventory Health</CardTitle>
-            <CardDescription>Warehouse turnover & stockouts</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <div className="flex justify-between">
-                <span>Turnover Ratio</span>
-                <span className="font-medium">{metrics.inventoryTurnover}</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Target: ≥10</p>
-            </div>
-            <div className="p-3 bg-yellow-900/20 rounded-md border border-yellow-800/30">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm">3 stockouts this week (Addis Hub)</span>
-              </div>
-            </div>
-            <Button variant="outline" className="w-full">
-              View Inventory Details
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Regional Breakdown (if applicable) */}
-      {user?.role === 'regional_manager' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Regional Performance: {user.region}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Regional-specific metrics would appear here.</p>
-          </CardContent>
-        </Card>
+      {isError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-red-700 text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          Failed to load operations data. <button className="underline ml-1" onClick={() => refetch()}>Retry</button>
+        </div>
       )}
+
+      {/* Active alerts */}
+      {!isLoading && m && (m.delayedShipments > 0 || m.stockoutItems > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {m.delayedShipments > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3 text-amber-800 text-sm">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span><strong>{m.delayedShipments}</strong> shipment{m.delayedShipments > 1 ? 's' : ''} currently delayed</span>
+            </div>
+          )}
+          {m.stockoutItems > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-red-800 text-sm">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span><strong>{m.stockoutItems}</strong> inventory SKU{m.stockoutItems > 1 ? 's' : ''} out of stock</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard label="On-Time Delivery" value={m ? `${m.onTimeDeliveryRate}%` : '—'} sub="Delivered ÷ (delivered + delayed)" icon={TrendingUp} loading={isLoading} />
+        <KpiCard label="Avg Fulfillment" value={m ? `${m.avgFulfillmentTime}h` : '—'} sub="Creation → delivery (30-day avg)" icon={Clock} loading={isLoading} />
+        <KpiCard label="Shipments This Month" value={m ? m.shipmentsProcessed.toLocaleString() : '—'} sub="Created since month start" icon={Package} loading={isLoading} />
+        <KpiCard label="Fleet Utilization" value={m ? `${m.fleetUtilization}%` : '—'} sub={m ? `${m.activeVehicles} active · ${m.idleVehicles} idle` : 'Loading…'} icon={Truck} loading={isLoading} />
+      </div>
+
+      {/* Fulfillment trend + Fleet stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Fulfillment Time Trend (Last 7 Days)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-52 w-full" />
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={data?.fulfillmentTrend ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                  <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}h`} />
+                  <Tooltip formatter={(v: number) => [`${v.toFixed(1)}h`, 'Avg time']} />
+                  <Line type="monotone" dataKey="time" stroke="#1A3C8F" strokeWidth={2.5} dot={{ fill: '#1A3C8F', r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <BarChart3 className="h-4 w-4 text-brand-600" /> Inventory Health
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-2">
+            {isLoading ? (
+              [1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full" />)
+            ) : (
+              <>
+                <div className="p-3 rounded-lg bg-gray-50 flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Inventory Turnover</span>
+                  <span className="text-sm font-bold text-gray-900">{m?.inventoryTurnover ?? '—'}×</span>
+                </div>
+                <div className="p-3 rounded-lg bg-gray-50 flex justify-between items-center">
+                  <span className="text-sm text-gray-600">SKUs Out of Stock</span>
+                  <span className={`text-sm font-bold ${(m?.stockoutItems ?? 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>{m?.stockoutItems ?? '—'}</span>
+                </div>
+                <div className="p-3 rounded-lg bg-gray-50 flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Fleet Active</span>
+                  <span className="text-sm font-bold text-gray-900">{m?.activeVehicles ?? '—'} vehicles</span>
+                </div>
+                <div className="p-3 rounded-lg bg-gray-50 flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Fleet Idle</span>
+                  <span className={`text-sm font-bold ${(m?.idleVehicles ?? 0) > (m?.activeVehicles ?? 0) * 0.25 ? 'text-amber-600' : 'text-green-600'}`}>{m?.idleVehicles ?? '—'} vehicles</span>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* AI Insights */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Bot className="h-4 w-4 text-brand-600" /> AI Operations Insights
+          </CardTitle>
+          <CardDescription>Anomalies and recommendations from live operational data</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isLoading ? (
+            [1, 2].map(i => <Skeleton key={i} className="h-24 w-full" />)
+          ) : (
+            (data?.insights ?? []).map(ins => <InsightCard key={ins.id} insight={ins} />)
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

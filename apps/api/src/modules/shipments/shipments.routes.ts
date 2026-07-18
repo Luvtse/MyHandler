@@ -3,6 +3,10 @@ import { shipmentsService } from './shipments.service';
 import { etaService } from './eta.service';
 import { requireAuth } from '../../services/authService';
 import prisma from '../../utils/prisma';
+import { emailService } from '../../services/emailService';
+import { audit } from '../../middlewares/auditLog';
+
+const DELIVERED_STATUSES = new Set(['DELIVERED_SUCCESSFULLY', 'DELIVERY_CONFIRMED', 'SIGNATURE_OBTAINED']);
 
 export const shipmentsRouter = Router();
 
@@ -120,6 +124,20 @@ shipmentsRouter.post('/', requireAuth, async (req: any, res) => {
     };
     
     const shipment = await shipmentsService.create(shipmentData);
+
+    // Fire-and-forget: email notification + audit log
+    const userId: string = shipmentData.userId ?? '';
+    if (userId) {
+      emailService.sendNotificationEmail(userId, 'SHIPMENT_CREATED', {
+        reference: (shipment as any).reference ?? (shipment as any).id,
+        origin: (shipment as any).originAddress ?? req.body.originAddress,
+        destination: (shipment as any).destinationAddress ?? req.body.destinationAddress,
+        serviceType: (shipment as any).serviceLevel ?? req.body.serviceLevel,
+      }).catch(err => console.error('[Shipment email] create:', err));
+
+      audit({ req, action: 'CREATE', entity: 'Shipment', entityId: (shipment as any).id }).catch(() => {});
+    }
+
     res.status(201).json({
       success: true,
       data: shipment
@@ -463,6 +481,21 @@ shipmentsRouter.post('/:id/tracking-events', requireAuth, async (req: any, res) 
     }
 
     const event = await shipmentsService.addTrackingEvent(req.params.id, req.body);
+
+    // If this tracking event marks the shipment as delivered, send notification
+    if (DELIVERED_STATUSES.has(req.body?.status ?? '')) {
+      const shipment: any = existingShipment;
+      if (shipment?.userId) {
+        emailService.sendNotificationEmail(shipment.userId, 'SHIPMENT_DELIVERED', {
+          reference: shipment.reference ?? shipment.id,
+          destination: shipment.destinationAddress,
+          deliveredAt: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
+        }).catch(err => console.error('[Shipment email] delivered:', err));
+
+        audit({ req, action: 'STATUS_CHANGE', entity: 'Shipment', entityId: req.params.id, changes: { status: req.body.status } }).catch(() => {});
+      }
+    }
+
     res.status(201).json({
       success: true,
       data: event

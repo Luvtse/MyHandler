@@ -81,9 +81,14 @@ export const reportController = {
       }
 
       // Set appropriate content type and headers
-      const contentType = validatedData.format === 'excel' 
-        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        : 'text/csv';
+      let contentType: string;
+      if (validatedData.format === 'excel') {
+        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      } else if (validatedData.format === 'pdf') {
+        contentType = 'application/pdf';
+      } else {
+        contentType = 'text/csv';
+      }
 
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

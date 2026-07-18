@@ -1,374 +1,245 @@
-// @/dashboard/executive/cmo/CmoDashboard.tsx (UPDATED)
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
-  Users,
-  TrendingUp,
-  DollarSign,
-  FileText,
-  Calendar,
-  AlertCircle,
-  RefreshCw,
-  BarChart3,
-  Mail,
-  Smartphone,
-  Target,
-  Bot,
-  Globe,
+  Users, TrendingUp, FileText, AlertCircle, RefreshCw,
+  BarChart3, Target, Bot, CheckCircle, Zap,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ResponsiveContainer, FunnelChart, Funnel, Tooltip, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { useAuth } from '@/features/auth/hooks';
-import type {ClientAcquisition, AtRiskClient, MarketingMetrics, CampaignPerformance} from '@/types/executive'
-import { toast } from 'sonner';
+import { getCmoData } from '@/services/executive';
+import type { CmoData, ExecutiveInsight } from '@/services/executive';
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Mock data
-const mockMetrics: MarketingMetrics = {
-  totalLeads: 1240,
-  conversionRate: 8.7,
-  costPerAcquisition: 1850,
-  roi: 12.4,
-  emailOpenRate: 42.3,
-  socialEngagement: 3.8,
-  websiteTraffic: 28500,
-  retentionRate: 88.2,
-};
+function fmt(n: number) {
+  return n >= 1_000_000 ? `ETB ${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `ETB ${(n / 1_000).toFixed(0)}K` : `ETB ${n.toLocaleString()}`;
+}
 
-const mockCampaigns: CampaignPerformance[] = [
-  {
-    id: 'camp-01',
-    name: 'Q4 Enterprise Email',
-    channel: 'email',
-    spend: 45000,
-    leads: 320,
-    conversions: 42,
-    roi: 18.5,
-    cac: 1071,
-  },
-  {
-    id: 'camp-02',
-    name: 'TikTok Awareness',
-    channel: 'social',
-    spend: 60000,
-    leads: 180,
-    conversions: 12,
-    roi: 4.2,
-    cac: 5000,
-  },
-];
+function InsightCard({ insight }: { insight: ExecutiveInsight }) {
+  const Icon = insight.severity === 'high' ? AlertCircle : insight.severity === 'medium' ? Zap : CheckCircle;
+  const cls = { high: 'text-red-500', medium: 'text-amber-500', low: 'text-green-500' }[insight.severity];
+  const bg = { high: 'border-red-100 bg-red-50/30', medium: 'border-amber-100 bg-amber-50/30', low: 'border-green-100 bg-green-50/30' }[insight.severity];
+  return (
+    <div className={`p-4 rounded-xl border ${bg} space-y-2`}>
+      <div className="flex items-center gap-2">
+        <Icon className={`h-4 w-4 ${cls}`} />
+        <span className="text-sm font-semibold text-gray-800">{insight.title}</span>
+        <span className="ml-auto text-xs text-gray-400">{Math.round(insight.confidence * 100)}% conf.</span>
+      </div>
+      <p className="text-sm text-gray-600">{insight.message}</p>
+      <p className="text-xs text-brand-700 font-medium bg-brand-50 rounded-lg px-3 py-1.5">💡 {insight.recommendation}</p>
+    </div>
+  );
+}
 
-// NEW: Account Manager integration data
-const mockClientAcquisitions: ClientAcquisition[] = [
-  {
-    id: 'CLT-005',
-    clientName: 'Nile Pharma',
-    sourceChannel: 'email',
-    quotationValue: 180000,
-    status: 'won',
-    accountManager: 'Abebe K.',
-    createdAt: '2026-01-05',
-  },
-  {
-    id: 'CLT-006',
-    clientName: 'Lion Brewery',
-    sourceChannel: 'search',
-    quotationValue: 220000,
-    status: 'pending',
-    accountManager: 'Selamawit G.',
-    createdAt: '2026-01-06',
-  },
-];
+function KpiCard({ label, value, sub, icon: Icon, loading }: { label: string; value: string; sub: string; icon: React.ElementType; loading: boolean }) {
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm text-gray-500">{label}</span>
+          <div className="p-2 bg-brand-50 rounded-lg"><Icon className="h-4 w-4 text-brand-600" /></div>
+        </div>
+        {loading ? <Skeleton className="h-8 w-28 mb-1" /> : <p className="text-2xl font-bold text-gray-900">{value}</p>}
+        <p className="text-xs text-gray-400 mt-1">{sub}</p>
+      </CardContent>
+    </Card>
+  );
+}
 
-const mockAtRiskClients: AtRiskClient[] = [
-  {
-    id: 'CLT-002',
-    name: 'Dashen Brewery',
-    reason: 'contract_expiring',
-    lastContact: '2026-01-04',
-    accountManager: 'Abebe K.',
-  },
-];
-
-const funnelData = [
-  { value: 28500, name: 'Website Visitors' },
-  { value: 1240, name: 'Leads' },
-  { value: 108, name: 'Quotations' }, // ← From Account Manager
-  { value: 42, name: 'Won Clients' },  // ← From Account Manager
-];
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 
 const CmoDashboard = () => {
   const { user } = useAuth();
-  const [metrics] = useState<MarketingMetrics>(mockMetrics);
-  const [campaigns] = useState<CampaignPerformance[]>(mockCampaigns);
-  const [clientAcquisitions] = useState<ClientAcquisition[]>(mockClientAcquisitions);
-  const [atRiskClients] = useState<AtRiskClient[]>(mockAtRiskClients);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<CmoData>({
+    queryKey: ['cmo-dashboard'],
+    queryFn: getCmoData,
+    staleTime: 2 * 60_000,
+    retry: 1,
+  });
 
-  const refreshData = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      toast.success('Marketing & sales data refreshed');
-    }, 600);
-  };
+  const m = data?.metrics;
 
-  useEffect(() => {
-    const interval = setInterval(refreshData, 300_000);
-    return () => clearInterval(interval);
-  }, []);
+  const funnelColors = ['#1A3C8F', '#2D5FBF', '#4A85E0', '#FFC107'];
 
-  const getChannelIcon = (channel: string) => {
-    switch (channel) {
-      case 'email': return <Mail className="h-4 w-4" />;
-      case 'social': return <Smartphone className="h-4 w-4" />;
-      case 'search': return <Globe className="h-4 w-4" />;
-      default: return <Target className="h-4 w-4" />;
-    }
+  const DEAL_STATUSES: Record<string, { label: string; color: string }> = {
+    won: { label: 'Won', color: '#22C55E' },
+    pending: { label: 'Pending', color: '#F59E0B' },
+    lost: { label: 'Lost', color: '#EF4444' },
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">CMO Dashboard</h1>
-          <p className="text-muted-foreground">
-            Marketing performance + Account Manager pipeline integration
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900">CMO Marketing Dashboard</h1>
+          <p className="text-sm text-gray-500">Good morning, {user?.name ?? 'CMO'} · Live client & marketing pipeline</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={refreshData}
-          disabled={isRefreshing}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-2">
+          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>
 
-      {/* Core Marketing KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalLeads.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+12% vs last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Quotation Conversion</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.conversionRate}%</div>
-            <p className="text-xs text-muted-foreground">From leads to quotes</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">CAC</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">ETB {metrics.costPerAcquisition.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Cost per won client</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Retention Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.retentionRate}%</div>
-            <p className="text-xs text-muted-foreground">90-day active clients</p>
-          </CardContent>
-        </Card>
+      {isError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-red-700 text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          Failed to load marketing data. <button className="underline ml-1" onClick={() => refetch()}>Retry</button>
+        </div>
+      )}
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard label="Total Quotations" value={m ? m.totalLeads.toLocaleString() : '—'} sub="All time pipeline" icon={FileText} loading={isLoading} />
+        <KpiCard label="Conversion Rate" value={m ? `${m.conversionRate}%` : '—'} sub="Won ÷ total quotations" icon={TrendingUp} loading={isLoading} />
+        <KpiCard label="Client Retention" value={m ? `${m.retentionRate}%` : '—'} sub="Active 90-day vs prior 90" icon={Users} loading={isLoading} />
+        <KpiCard label="Active Clients" value={m ? m.activeClients.toLocaleString() : '—'} sub={m ? `of ${m.totalClients.toLocaleString()} total` : 'Loading…'} icon={Target} loading={isLoading} />
       </div>
 
-      {/* Integrated Funnel: Marketing → Sales */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+      {/* Deal funnel + At-risk clients */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Deal pipeline funnel */}
+        <Card className="lg:col-span-2 border-0 shadow-sm">
           <CardHeader>
-            <CardTitle>Integrated Growth Funnel</CardTitle>
-            <CardDescription>From lead to retained client</CardDescription>
+            <CardTitle className="text-base font-semibold">Quotation Pipeline Breakdown</CardTitle>
           </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <FunnelChart>
-                <Tooltip 
-                  formatter={(value) => [value.toLocaleString(), 'Count']}
-                  contentStyle={{ 
-                    backgroundColor: '#0f172a', 
-                    borderColor: '#334155' 
-                  }} 
-                />
-                <Funnel
-                  dataKey="value"
-                  data={funnelData}
-                  isAnimationActive
-                >
-                  {funnelData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill="#38bdf8" fillOpacity={0.8 - index * 0.2} />
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-52 w-full" />
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={data?.funnelData ?? []} layout="vertical" barSize={28}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} width={90} />
+                    <Tooltip />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                      {(data?.funnelData ?? []).map((_, i) => (
+                        <Cell key={i} fill={funnelColors[i] ?? '#94A3B8'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                {/* Deal status breakdown */}
+                <div className="mt-4 flex gap-4 flex-wrap">
+                  {[
+                    { label: 'Won', value: m?.wonDeals, color: '#22C55E' },
+                    { label: 'Pending', value: m?.pendingDeals, color: '#F59E0B' },
+                    { label: 'Lost', value: m?.lostDeals, color: '#EF4444' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50">
+                      <div className="w-2 h-2 rounded-full" style={{ background: color }} />
+                      <span className="text-sm text-gray-600">{label}</span>
+                      <span className="text-sm font-bold text-gray-900">{value ?? '—'}</span>
+                    </div>
                   ))}
-                </Funnel>
-              </FunnelChart>
-            </ResponsiveContainer>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        {/* Campaign ROI */}
-        <Card>
+        {/* At-risk clients */}
+        <Card className="border-0 shadow-sm">
           <CardHeader>
-            <CardTitle>Campaign ROI</CardTitle>
-            <CardDescription>Return on investment by channel</CardDescription>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <AlertCircle className="h-4 w-4 text-amber-500" /> At-Risk Clients
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {campaigns.map(camp => (
-                <div key={camp.id} className="border rounded-lg p-3">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      {getChannelIcon(camp.channel)}
-                      <span className="font-medium">{camp.name}</span>
-                    </div>
-                    <Badge className={camp.roi > 10 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
-                      {camp.roi}% ROI
-                    </Badge>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Spend</p>
-                      <p>ETB {camp.spend.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">CAC</p>
-                      <p>ETB {camp.cac.toLocaleString()}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* NEW: Account Manager Integration Panels */}
-
-      {/* Won Deals from Marketing */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Client Acquisitions</CardTitle>
-          <CardDescription>Won deals attributed to marketing channels</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Client</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Account Manager</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {clientAcquisitions.map(client => (
-                <TableRow key={client.id}>
-                  <TableCell className="font-medium">{client.clientName}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      {getChannelIcon(client.sourceChannel)}
-                      {client.sourceChannel}
-                    </div>
-                  </TableCell>
-                  <TableCell>ETB {client.quotationValue.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <Badge variant={client.status === 'won' ? 'default' : 'secondary'}>
-                      {client.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{client.accountManager}</TableCell>
-                  <TableCell>{new Date(client.createdAt).toLocaleDateString()}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* At-Risk Clients Needing Marketing Support */}
-      <Card>
-        <CardHeader>
-          <CardTitle>At-Risk Clients</CardTitle>
-          <CardDescription>Account Manager flagged clients needing retention campaigns</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {atRiskClients.map(client => (
-              <div key={client.id} className="flex items-start justify-between p-3 border rounded-lg">
-                <div>
-                  <p className="font-medium">{client.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {client.reason === 'contract_expiring' && 'Contract expires soon'}
-                    {client.reason === 'low_satisfaction' && 'Low satisfaction score'}
-                    {client.reason === 'high_tickets' && 'High support tickets'}
-                  </p>
-                  <p className="text-xs mt-1">AM: {client.accountManager} • Last contact: {client.lastContact}</p>
-                </div>
-                <Button size="sm" variant="outline">
-                  Launch Retention Campaign
-                </Button>
+          <CardContent className="space-y-2">
+            {isLoading ? (
+              [1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full" />)
+            ) : (data?.atRiskClients?.length ?? 0) === 0 ? (
+              <div className="flex flex-col items-center py-8 text-gray-400">
+                <CheckCircle className="h-8 w-8 mb-2 text-green-400" />
+                <p className="text-sm font-medium">All clients active</p>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Marketing + Sales Collaboration Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Marketing-Sourced Revenue</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">ETB 1.2M</div>
-            <p className="text-sm text-muted-foreground">MTD from marketing channels</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Avg. Sales Cycle</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">14 days</div>
-            <p className="text-sm text-muted-foreground">From lead to won deal</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Performing Channel</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-blue-500" />
-              <span className="font-medium">Email Campaigns</span>
-            </div>
-            <p className="text-sm text-muted-foreground">18.5% ROI</p>
+            ) : (
+              data?.atRiskClients.map((c: any) => (
+                <div key={c.id} className="p-3 rounded-lg bg-amber-50 border border-amber-100">
+                  <p className="text-sm font-semibold text-gray-800">{c.name}</p>
+                  <p className="text-xs text-amber-700 capitalize">{c.status.replace(/_/g, ' ')}</p>
+                  <p className="text-xs text-gray-400">Updated {new Date(c.updatedAt).toLocaleDateString()}</p>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Recent acquisitions */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Recent Quotations</CardTitle>
+          <CardDescription>Latest pipeline activity from client quotations</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-40 w-full" />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Value</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(data?.recentAcquisitions ?? []).length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center text-gray-400 py-6">No recent quotations</TableCell></TableRow>
+                ) : (
+                  (data?.recentAcquisitions ?? []).slice(0, 8).map((q: any) => (
+                    <TableRow key={q.id}>
+                      <TableCell className="font-medium">{q.client?.name ?? q.clientId}</TableCell>
+                      <TableCell>{fmt(q.totalAmount ?? 0)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" style={{ color: DEAL_STATUSES[q.status]?.color ?? '#64748B', borderColor: DEAL_STATUSES[q.status]?.color ?? '#94A3B8' }}>
+                          {DEAL_STATUSES[q.status]?.label ?? q.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-gray-500 text-sm">{new Date(q.createdAt).toLocaleDateString()}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* AI Insights */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Bot className="h-4 w-4 text-brand-600" /> AI Marketing Insights
+          </CardTitle>
+          <CardDescription>Anomalies and recommendations from live client & pipeline data</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isLoading ? (
+            [1, 2].map(i => <Skeleton key={i} className="h-24 w-full" />)
+          ) : (
+            (data?.insights ?? []).map(ins => <InsightCard key={ins.id} insight={ins} />)
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
+};
+
+const DEAL_STATUSES: Record<string, { label: string; color: string }> = {
+  won: { label: 'Won', color: '#22C55E' },
+  pending: { label: 'Pending', color: '#F59E0B' },
+  lost: { label: 'Lost', color: '#EF4444' },
 };
 
 export default CmoDashboard;

@@ -17,7 +17,7 @@ import { hrRouter } from '../modules/hr/hr.routes';
 import { notificationRouter } from '../modules/notifications/notification.routes';
 import { adminRouter } from '../modules/admin/admin.routes';
 import { reportRouter } from '../modules/reports/report.routes';
-import { executiveRouter } from '../modules/cmo/executive.routes';
+import { executiveRouter } from '../modules/executive/executive.routes';
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
@@ -48,6 +48,7 @@ apiRouter.use('/hr', hrRouter);
 apiRouter.use('/notifications', notificationRouter);
 apiRouter.use('/admin', adminRouter);
 apiRouter.use('/reports', reportRouter);
+apiRouter.use('/executive', executiveRouter);
 
 
 // Complete invitation: set password for invited internal users

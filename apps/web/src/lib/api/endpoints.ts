@@ -129,6 +129,13 @@ interface HREndpoints {
   };
 }
 
+interface ExecutiveEndpoints {
+  ceo: string;
+  cfo: string;
+  coo: string;
+  cmo: string;
+}
+
 // Update main ApiEndpoints interface
 interface ApiEndpoints {
   auth: AuthEndpoints;
@@ -137,7 +144,8 @@ interface ApiEndpoints {
   addresses: AddressEndpoints;
   finance: FinanceEndpoints;
   reports: ReportEndpoints;
-  hr: HREndpoints; // ✅ Add HR endpoints
+  hr: HREndpoints;
+  executive: ExecutiveEndpoints;
 }
 
 // ✅ Complete API_ENDPOINTS object with HR module
@@ -190,6 +198,13 @@ export const API_ENDPOINTS: ApiEndpoints = {
     METADATA: '/reports/metadata',
   },
   
+  executive: {
+    ceo: '/executive/ceo',
+    cfo: '/executive/cfo',
+    coo: '/executive/coo',
+    cmo: '/executive/cmo',
+  },
+
   // ✅ NEW: HR Module Endpoints
   hr: {
     // Leave types & balances
