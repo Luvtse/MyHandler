@@ -134,8 +134,8 @@ const CeoDashboard = () => {
   const getSeverityColor = (severity: StrategicInsight['severity']) => {
     switch (severity) {
       case 'high': return 'bg-destructive/10 border-destructive';
-      case 'medium': return 'bg-warning/10 border-warning';
-      default: return 'bg-info/10 border-info';
+      case 'medium': return 'bg-amber-50 border-amber-400';
+      default: return 'bg-blue-50 border-blue-400';
     }
   };
 

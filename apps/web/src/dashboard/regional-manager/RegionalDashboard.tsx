@@ -183,8 +183,8 @@ const RegionalDashboard = () => {
   const getSeverityColor = (severity: RegionalInsight['severity']) => {
     switch (severity) {
       case 'high': return 'bg-destructive/10 border-destructive';
-      case 'medium': return 'bg-warning/10 border-warning';
-      default: return 'bg-info/10 border-info';
+      case 'medium': return 'bg-amber-50 border-amber-400';
+      default: return 'bg-blue-50 border-blue-400';
     }
   };
 
@@ -229,7 +229,7 @@ const RegionalDashboard = () => {
             <Card key={insight.id} className={`border-l-4 ${getSeverityColor(insight.severity)}`}>
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                  <Bot className="h-4 w-4 text-info" />
+                  <Bot className="h-4 w-4 text-blue-500" />
                   <div className="flex-1">
                     <h3 className="font-semibold flex items-center gap-2">
                       {insight.title}

@@ -104,16 +104,16 @@ const CooDashboard = () => {
   const getSeverityColor = (severity: OperationalInsight['severity']) => {
     switch (severity) {
       case 'high': return 'bg-destructive/10 border-destructive';
-      case 'medium': return 'bg-warning/10 border-warning';
-      default: return 'bg-info/10 border-info';
+      case 'medium': return 'bg-amber-50 border-amber-400';
+      default: return 'bg-blue-50 border-blue-400';
     }
   };
 
   const getSeverityIcon = (severity: OperationalInsight['severity']) => {
     switch (severity) {
       case 'high': return <AlertTriangle className="h-4 w-4 text-destructive" />;
-      case 'medium': return <Zap className="h-4 w-4 text-warning" />;
-      default: return <Bot className="h-4 w-4 text-info" />;
+      case 'medium': return <Zap className="h-4 w-4 text-amber-500" />;
+      default: return <Bot className="h-4 w-4 text-blue-500" />;
     }
   };
 

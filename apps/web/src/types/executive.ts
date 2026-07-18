@@ -92,7 +92,7 @@ export interface AtRiskClient {
 export interface GetCmoIntegratedResponse {
   success: boolean;
   data: {
-    metrics: MarketingMetrics[];
+    metrics: MarketingMetrics;
     campaigns: CampaignPerformance[];
     wonClients: ClientAcquisition[];
     atRiskClients: AtRiskClient[];

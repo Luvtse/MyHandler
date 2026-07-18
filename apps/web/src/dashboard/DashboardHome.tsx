@@ -42,13 +42,8 @@ const DashboardHome = () => {
         navigate('/dashboard/service-point', { replace: true });
         break;
       case 'hr_manager':
-        navigate('/dashboard/hr', { replace: true });
-        break;
       case 'hr_staff':
         navigate('/dashboard/hr', { replace: true });
-        break;
-      default:
-        navigate('/dashboard', { replace: true });
         break;
       case 'operations':
         navigate('/dashboard/operations', { replace: true });
@@ -56,8 +51,11 @@ const DashboardHome = () => {
       case 'account_manager':
         navigate('/dashboard/account', { replace: true });
         break;
+      case 'fleet_manager':
+        navigate('/dashboard/fleet-manager', { replace: true });
+        break;
       case 'regional_manager':
-        navigate('/dashboard/region', { replace: true });
+        navigate(`/dashboard/regional/${user.region || 'addis_ababa'}`, { replace: true });
         break;
       case 'coo':
         navigate('/dashboard/coo', { replace: true });
@@ -70,6 +68,9 @@ const DashboardHome = () => {
         break;
       case 'ceo':
         navigate('/dashboard/ceo', { replace: true });
+        break;
+      default:
+        navigate('/dashboard', { replace: true });
         break;
     }
   }, [user, isLoading, navigate]);

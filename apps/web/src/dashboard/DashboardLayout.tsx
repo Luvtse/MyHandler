@@ -78,7 +78,7 @@ const DashboardLayout: React.FC = () => {
             <div className="flex items-center">
               <Link to="/" className="flex items-center font-bold text-xl text-primary">
                 <Package className="h-6 w-6 mr-2" />
-                <span>DeliverEase</span>
+                <span>GoodsHandler</span>
               </Link>
               <span className="ml-2 text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-md">
                 Admin
