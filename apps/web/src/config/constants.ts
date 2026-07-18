@@ -3,7 +3,7 @@
 import { canonicalToPrismaSnake, normalizeStatusId } from "@/lib/tracking-utils";
 
 export const APP_CONFIG = {
-  name: 'AHUNUNU Logistics',
+  name: 'GoodsHandler',
   version: '1.0.0',
   defaultLanguage: 'en',
   supportedLanguages: ['en', 'fr', 'es'],

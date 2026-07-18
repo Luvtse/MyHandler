@@ -174,7 +174,7 @@ const Tracking = () => {
                   </div>
                   <h2 className="text-xl font-semibold text-gray-900 mb-2">Enter a tracking number to begin</h2>
                   <p className="text-gray-600 max-w-md">
-                    Enter your AHUNUNU tracking number above to get detailed information about your shipment status.
+                    Enter your GoodsHandler tracking number above to get detailed information about your shipment status.
                   </p>
                 </div>
               )}

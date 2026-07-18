@@ -10,14 +10,14 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="flex flex-col space-y-4">
             <div className="flex items-center">
-              <img src="/logo.png" alt="AHUNUNU Logo" className="h-12 w-auto" />
+              <img src="/logo.png" alt="GoodsHandler Logo" className="h-12 w-auto" />
             </div>
             <p className="text-gray-600 text-sm">
               The fastest and most reliable logistics and express delivery service worldwide.
             </p>
             <div className="flex items-center space-x-4 mt-4">
               <a
-                href="https://facebook.com/ahununu"
+                href="https://facebook.com/goodshandler"
                 aria-label="Visit our Facebook"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -28,7 +28,7 @@ const Footer = () => {
                 </svg>
               </a>
               <a
-                href="https://twitter.com/ahununu"
+                href="https://twitter.com/goodshandler"
                 aria-label="Visit our Twitter"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -39,7 +39,7 @@ const Footer = () => {
                 </svg>
               </a>
               <a
-                href="https://github.com/ahununu"
+                href="https://github.com/goodshandler"
                 aria-label="Visit our GitHub"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -87,7 +87,7 @@ const Footer = () => {
               </li>
               <li className="flex items-center">
                 <Mail className="h-5 w-5 text-brand mr-2 flex-shrink-0" />
-                <span className="text-gray-600">contact@ahununu.com</span>
+                <span className="text-gray-600">contact@goodshandler.com</span>
               </li>
             </ul>
           </div>
@@ -95,7 +95,7 @@ const Footer = () => {
 
         <div className="mt-10 pt-6 border-t border-gray-200">
           <p className="text-sm text-gray-500 text-center">
-            &copy; {new Date().getFullYear()} AHUNUNU Logistics. All rights reserved.
+            &copy; {new Date().getFullYear()} GoodsHandler. All rights reserved.
           </p>
         </div>
       </div>

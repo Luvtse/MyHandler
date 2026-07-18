@@ -423,11 +423,11 @@ const CreateShipmentPage = () => {
           date: new Date(),
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           companyInfo: {
-            name: 'AHUNUNU Logistics',
+            name: 'GoodsHandler',
             address: '123 Logistics Way, Shipping City, SC 12345',
             phone: '+1 (800) 123-4567',
-            email: 'info@ahununu.com',
-            website: 'www.ahununu.com',
+            email: 'info@goodshandler.com',
+            website: 'www.goodshandler.com',
             vatNumber: 'VAT123456789',
           },
           customerInfo: {
@@ -479,7 +479,7 @@ const CreateShipmentPage = () => {
           paymentInfo: {
             method: paymentType === 'account' ? 'Account' : paymentType === 'prepaid' ? 'Prepaid' : 'Collect',
             bankName: 'Commercial Bank of Ethiopia',
-            accountName: 'AHUNUNU Logistics',
+            accountName: 'GoodsHandler',
             accountNumber: '1000123456789',
             swiftCode: 'CBETETAA',
           },

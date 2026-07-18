@@ -56,7 +56,7 @@ const Header = () => {
             <Link to="/">
               <img 
                 src="/logo.png" 
-                alt="AHUNUNU Logo" 
+                alt="GoodsHandler Logo" 
                 className="h-16 w-auto" 
               />
             </Link>

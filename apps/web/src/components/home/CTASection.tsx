@@ -11,7 +11,7 @@ const CTASection = () => {
           <div className="mb-6 md:mb-0 text-center md:text-left md:max-w-xl">
             <h2 className="text-3xl font-bold text-white mb-4">Ready to ship with confidence?</h2>
             <p className="text-white text-opacity-90 text-lg">
-              Join thousands of satisfied customers who trust AHUNUNU for their logistics needs. Sign up now and experience the difference.
+              Join thousands of satisfied customers who trust GoodsHandler for their logistics needs. Sign up now and experience the difference.
             </p>
           </div>
           

@@ -82,7 +82,7 @@ const Register = () => {
               </div>
               <h1 className="mt-4 text-2xl font-bold text-gray-900">Create your account</h1>
               <p className="mt-2 text-sm text-gray-600">
-                Join AHUNUNU for fast and reliable shipping
+                Join GoodsHandler for fast and reliable shipping
               </p>
             </div>
             

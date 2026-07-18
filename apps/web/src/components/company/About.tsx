@@ -11,11 +11,11 @@ const About = () => {
     <MainLayout>
       <div className="logistics-container py-16">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-bold text-gray-900 mb-6">About AHUNUNU Logistics</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-6">About GoodsHandler</h1>
           
           <div className="prose prose-lg max-w-none">
             <p className="text-xl text-gray-600 mb-8">
-              AHUNUNU Logistics is a leading global provider of logistics and transportation solutions,
+              GoodsHandler is a leading global provider of logistics and transportation solutions,
               committed to connecting businesses and people through innovative and sustainable delivery services.
             </p>
 

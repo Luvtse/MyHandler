@@ -7,7 +7,7 @@ const FeaturesSection = () => {
     <section className="py-16 bg-gray-50">
       <div className="logistics-container">
         <div className="text-center mb-10">
-          <h2 className="text-3xl font-bold text-gray-900">Why Choose AHUNUNU</h2>
+          <h2 className="text-3xl font-bold text-gray-900">Why Choose GoodsHandler</h2>
           <p className="text-gray-600 mt-2 max-w-2xl mx-auto">
             We combine cutting-edge technology with exceptional service to provide the best logistics experience.
           </p>

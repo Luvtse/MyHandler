@@ -101,7 +101,7 @@ const generateLogoPlaceholder = (): string => {
     
     ctx.fillStyle = BLACK;
     ctx.font = 'bold 20px Arial';
-    ctx.fillText('AHUNUNU', 15, 28);
+    ctx.fillText('GoodsHandler', 15, 28);
     ctx.font = '12px Arial';
     ctx.fillText('EXPRESS', 95, 28);
   }
@@ -563,7 +563,7 @@ const generateAWBPDF = async (shipment: Shipment): Promise<void> => {
     doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - 80, doc.internal.pageSize.height - 10);
     
     // Save the PDF with a dynamic filename
-    const filename = `AHUNUNU_AWB_${awbData.awbNumber}_${awbData.date.replace(/\//g, '-')}.pdf`;
+    const filename = `GoodsHandler_AWB_${awbData.awbNumber}_${awbData.date.replace(/\//g, '-')}.pdf`;
     doc.save(filename);
 
   } catch (error) {
