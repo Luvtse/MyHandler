@@ -30,37 +30,41 @@ const TrackingForm = ({ onSubmit }: TrackingFormProps) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
-      <h2 className="text-2xl font-semibold text-gray-900 mb-4">Track Your Shipment</h2>
-      <p className="text-gray-600 mb-6">
+    <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50">
+        <Search className="h-6 w-6 text-brand" />
+      </div>
+      <h2 className="text-xl font-bold text-gray-900 mb-2">Track Your Shipment</h2>
+      <p className="text-gray-500 mb-6 leading-relaxed text-sm">
         Enter your tracking number to get detailed information about your package status and location.
       </p>
-      
+
       <form onSubmit={handleSubmit}>
         <div className="relative">
           <Input
             type="text"
             value={trackingNumber}
             onChange={(e) => setTrackingNumber(e.target.value)}
-            placeholder="Enter tracking number (e.g., ANU0000000000)"
-            className={`pr-12 ${error ? 'border-red-500' : 'border-gray-300'}`}
+            placeholder="e.g., ANU0000000000"
+            className={`h-11 ${error ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+            aria-invalid={!!error}
           />
           {error && (
-            <p className="text-red-500 text-sm mt-1">{error}</p>
+            <p className="text-destructive text-sm mt-2">{error}</p>
           )}
         </div>
-        
-        <Button type="submit" className="mt-4 w-full bg-brand hover:bg-brand-600">
+
+        <Button type="submit" className="mt-4 w-full h-11 bg-brand hover:bg-brand-600 font-semibold">
           <Search className="mr-2 h-5 w-5" />
           Track Package
         </Button>
       </form>
-      
-      <div className="mt-6 pt-6 border-t border-gray-200">
-        <h3 className="font-medium text-gray-900 mb-2">Need help?</h3>
-        <p className="text-gray-600 text-sm">
-          Tracking number can be found in your shipping confirmation email or receipt. 
-          If you're having trouble, please <a href="/support" className="text-brand hover:underline">contact our support team</a>.
+
+      <div className="mt-6 pt-6 border-t border-gray-100">
+        <h3 className="font-semibold text-gray-900 mb-2 text-sm">Need help?</h3>
+        <p className="text-gray-500 text-sm leading-relaxed">
+          Your tracking number can be found in your shipping confirmation email or receipt.
+          If you&apos;re having trouble, please <a href="/support" className="text-brand font-medium hover:underline">contact our support team</a>.
         </p>
       </div>
     </div>
