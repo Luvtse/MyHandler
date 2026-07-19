@@ -67,12 +67,6 @@ const CmoDashboard = () => {
 
   const funnelColors = ['#1A3C8F', '#2D5FBF', '#4A85E0', '#FFC107'];
 
-  const DEAL_STATUSES: Record<string, { label: string; color: string }> = {
-    won: { label: 'Won', color: '#22C55E' },
-    pending: { label: 'Pending', color: '#F59E0B' },
-    lost: { label: 'Lost', color: '#EF4444' },
-  };
-
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}

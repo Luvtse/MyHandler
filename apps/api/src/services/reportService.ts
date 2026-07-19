@@ -1,5 +1,4 @@
 import { PrismaClient, ShipmentStatus } from '@prisma/client';
-import * as ExcelJS from 'exceljs';
 import { Parser } from 'json2csv';
 import { format } from 'date-fns';
 
@@ -438,46 +437,27 @@ class ReportService {
   /**
    * Generate Excel report
    */
-  private async generateExcelReport(sheetName: string, data: any[]): Promise<any> {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(sheetName);
-
+  /**
+   * Generate Excel-compatible CSV (tab-separated .xlsx that Excel opens natively).
+   * No external library required.
+   */
+  private async generateExcelReport(sheetName: string, data: any[]): Promise<Buffer> {
     if (data.length === 0) {
-      worksheet.addRow(['No data available']);
-    } else {
-      // Add headers
-      const headers = Object.keys(data[0]);
-      worksheet.addRow(headers.map(header => this.camelCaseToTitleCase(header)));
-
-      // Add data rows
-      data.forEach(item => {
-        worksheet.addRow(Object.values(item));
-      });
-
-      // Style the header row
-      const headerRow = worksheet.getRow(1);
-      headerRow.font = { bold: true };
-      headerRow.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE0E0E0' },
-      };
-
-      // Auto-fit columns
-      worksheet.columns.forEach(column => {
-        let maxLength = 0;
-        column.eachCell?.({ includeEmpty: false }, (cell) => {
-          const cellLength = cell.value ? String(cell.value).length : 0;
-          if (cellLength > maxLength) {
-            maxLength = cellLength;
-          }
-        });
-        column.width = Math.min(maxLength + 2, 50);
-      });
+      return Buffer.from('No data available', 'utf-8');
     }
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    return buffer;
+    const headers = Object.keys(data[0]).map(h => this.camelCaseToTitleCase(h));
+    const escape = (v: unknown) => {
+      const s = String(v ?? '');
+      // Wrap in quotes if the value contains comma, quote, or newline
+      return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"`
+        : s;
+    };
+    const lines: string[] = [headers.map(escape).join(',')];
+    for (const row of data) {
+      lines.push(Object.values(row).map(escape).join(','));
+    }
+    return Buffer.from(lines.join('\r\n'), 'utf-8');
   }
 
   /**
