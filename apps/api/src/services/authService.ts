@@ -1,13 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
+import prisma from '../utils/prisma';
 import { Router } from 'express';
-import { PrismaClient, UserRole } from '@prisma/client';
+import { UserRole } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { ServerAuth } from './serverAuth';
 import { env } from '../config/env';
 import { hasPermission, Permission } from '../security/permissions';
 import crypto from 'crypto';
 
-const prisma = new PrismaClient();
 export const authRouter = Router();
 
 const JWT_SECRET = env.jwtSecret;

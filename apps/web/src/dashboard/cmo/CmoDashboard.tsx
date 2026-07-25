@@ -14,16 +14,32 @@ import { useAuth } from '@/features/auth/hooks';
 import { getCmoData } from '@/services/executive';
 import type { CmoData, ExecutiveInsight } from '@/services/executive';
 
+// ─── Constants — defined at module scope so they're always available in JSX ───
+
+const DEAL_STATUSES: Record<string, { label: string; color: string }> = {
+  won:     { label: 'Won',     color: '#22C55E' },
+  pending: { label: 'Pending', color: '#F59E0B' },
+  lost:    { label: 'Lost',    color: '#EF4444' },
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(n: number) {
-  return n >= 1_000_000 ? `ETB ${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `ETB ${(n / 1_000).toFixed(0)}K` : `ETB ${n.toLocaleString()}`;
+  return n >= 1_000_000
+    ? `ETB ${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1_000
+    ? `ETB ${(n / 1_000).toFixed(0)}K`
+    : `ETB ${n.toLocaleString()}`;
 }
 
 function InsightCard({ insight }: { insight: ExecutiveInsight }) {
   const Icon = insight.severity === 'high' ? AlertCircle : insight.severity === 'medium' ? Zap : CheckCircle;
-  const cls = { high: 'text-red-500', medium: 'text-amber-500', low: 'text-green-500' }[insight.severity];
-  const bg = { high: 'border-red-100 bg-red-50/30', medium: 'border-amber-100 bg-amber-50/30', low: 'border-green-100 bg-green-50/30' }[insight.severity];
+  const cls  = { high: 'text-red-500', medium: 'text-amber-500', low: 'text-green-500' }[insight.severity];
+  const bg   = {
+    high:   'border-red-100 bg-red-50/30',
+    medium: 'border-amber-100 bg-amber-50/30',
+    low:    'border-green-100 bg-green-50/30',
+  }[insight.severity];
   return (
     <div className={`p-4 rounded-xl border ${bg} space-y-2`}>
       <div className="flex items-center gap-2">
@@ -37,7 +53,9 @@ function InsightCard({ insight }: { insight: ExecutiveInsight }) {
   );
 }
 
-function KpiCard({ label, value, sub, icon: Icon, loading }: { label: string; value: string; sub: string; icon: React.ElementType; loading: boolean }) {
+function KpiCard({ label, value, sub, icon: Icon, loading }: {
+  label: string; value: string; sub: string; icon: React.ElementType; loading: boolean;
+}) {
   return (
     <Card className="border-0 shadow-sm">
       <CardContent className="p-5">
@@ -45,7 +63,9 @@ function KpiCard({ label, value, sub, icon: Icon, loading }: { label: string; va
           <span className="text-sm text-gray-500">{label}</span>
           <div className="p-2 bg-brand-50 rounded-lg"><Icon className="h-4 w-4 text-brand-600" /></div>
         </div>
-        {loading ? <Skeleton className="h-8 w-28 mb-1" /> : <p className="text-2xl font-bold text-gray-900">{value}</p>}
+        {loading
+          ? <Skeleton className="h-8 w-28 mb-1" />
+          : <p className="text-2xl font-bold text-gray-900">{value}</p>}
         <p className="text-xs text-gray-400 mt-1">{sub}</p>
       </CardContent>
     </Card>
@@ -57,14 +77,13 @@ function KpiCard({ label, value, sub, icon: Icon, loading }: { label: string; va
 const CmoDashboard = () => {
   const { user } = useAuth();
   const { data, isLoading, isError, refetch, isFetching } = useQuery<CmoData>({
-    queryKey: ['cmo-dashboard'],
-    queryFn: getCmoData,
+    queryKey:  ['cmo-dashboard'],
+    queryFn:   getCmoData,
     staleTime: 2 * 60_000,
-    retry: 1,
+    retry:     1,
   });
 
   const m = data?.metrics;
-
   const funnelColors = ['#1A3C8F', '#2D5FBF', '#4A85E0', '#FFC107'];
 
   return (
@@ -73,7 +92,9 @@ const CmoDashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">CMO Marketing Dashboard</h1>
-          <p className="text-sm text-gray-500">Good morning, {user?.name ?? 'CMO'} · Live client & marketing pipeline</p>
+          <p className="text-sm text-gray-500">
+            Good morning, {user?.name ?? 'CMO'} · Live client &amp; marketing pipeline
+          </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-2">
           <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
@@ -84,21 +105,21 @@ const CmoDashboard = () => {
       {isError && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-red-700 text-sm">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          Failed to load marketing data. <button className="underline ml-1" onClick={() => refetch()}>Retry</button>
+          Failed to load marketing data.{' '}
+          <button className="underline ml-1" onClick={() => refetch()}>Retry</button>
         </div>
       )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard label="Total Quotations" value={m ? m.totalLeads.toLocaleString() : '—'} sub="All time pipeline" icon={FileText} loading={isLoading} />
-        <KpiCard label="Conversion Rate" value={m ? `${m.conversionRate}%` : '—'} sub="Won ÷ total quotations" icon={TrendingUp} loading={isLoading} />
-        <KpiCard label="Client Retention" value={m ? `${m.retentionRate}%` : '—'} sub="Active 90-day vs prior 90" icon={Users} loading={isLoading} />
-        <KpiCard label="Active Clients" value={m ? m.activeClients.toLocaleString() : '—'} sub={m ? `of ${m.totalClients.toLocaleString()} total` : 'Loading…'} icon={Target} loading={isLoading} />
+        <KpiCard label="Total Quotations"  value={m ? m.totalLeads.toLocaleString() : '—'}     sub="All time pipeline"              icon={FileText}  loading={isLoading} />
+        <KpiCard label="Conversion Rate"   value={m ? `${m.conversionRate}%` : '—'}             sub="Won ÷ total quotations"          icon={TrendingUp} loading={isLoading} />
+        <KpiCard label="Client Retention"  value={m ? `${m.retentionRate}%` : '—'}              sub="Active 90-day vs prior 90"       icon={Users}     loading={isLoading} />
+        <KpiCard label="Active Clients"    value={m ? m.activeClients.toLocaleString() : '—'}   sub={m ? `of ${m.totalClients.toLocaleString()} total` : 'Loading…'} icon={Target} loading={isLoading} />
       </div>
 
       {/* Deal funnel + At-risk clients */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Deal pipeline funnel */}
         <Card className="lg:col-span-2 border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-base font-semibold">Quotation Pipeline Breakdown</CardTitle>
@@ -121,12 +142,11 @@ const CmoDashboard = () => {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                {/* Deal status breakdown */}
                 <div className="mt-4 flex gap-4 flex-wrap">
                   {[
-                    { label: 'Won', value: m?.wonDeals, color: '#22C55E' },
+                    { label: 'Won',     value: m?.wonDeals,     color: '#22C55E' },
                     { label: 'Pending', value: m?.pendingDeals, color: '#F59E0B' },
-                    { label: 'Lost', value: m?.lostDeals, color: '#EF4444' },
+                    { label: 'Lost',    value: m?.lostDeals,    color: '#EF4444' },
                   ].map(({ label, value, color }) => (
                     <div key={label} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50">
                       <div className="w-2 h-2 rounded-full" style={{ background: color }} />
@@ -140,7 +160,6 @@ const CmoDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* At-risk clients */}
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
@@ -156,7 +175,7 @@ const CmoDashboard = () => {
                 <p className="text-sm font-medium">All clients active</p>
               </div>
             ) : (
-              data?.atRiskClients.map((c: any) => (
+              data?.atRiskClients.map((c: { id: string; name: string; status: string; updatedAt: string }) => (
                 <div key={c.id} className="p-3 rounded-lg bg-amber-50 border border-amber-100">
                   <p className="text-sm font-semibold text-gray-800">{c.name}</p>
                   <p className="text-xs text-amber-700 capitalize">{c.status.replace(/_/g, ' ')}</p>
@@ -189,18 +208,37 @@ const CmoDashboard = () => {
               </TableHeader>
               <TableBody>
                 {(data?.recentAcquisitions ?? []).length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center text-gray-400 py-6">No recent quotations</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-gray-400 py-6">
+                      No recent quotations
+                    </TableCell>
+                  </TableRow>
                 ) : (
-                  (data?.recentAcquisitions ?? []).slice(0, 8).map((q: any) => (
+                  (data?.recentAcquisitions ?? []).slice(0, 8).map((q: {
+                    id: string;
+                    client?: { name: string };
+                    clientId: string;
+                    totalAmount?: number;
+                    status: string;
+                    createdAt: string;
+                  }) => (
                     <TableRow key={q.id}>
                       <TableCell className="font-medium">{q.client?.name ?? q.clientId}</TableCell>
                       <TableCell>{fmt(q.totalAmount ?? 0)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" style={{ color: DEAL_STATUSES[q.status]?.color ?? '#64748B', borderColor: DEAL_STATUSES[q.status]?.color ?? '#94A3B8' }}>
+                        <Badge
+                          variant="outline"
+                          style={{
+                            color:       DEAL_STATUSES[q.status]?.color ?? '#64748B',
+                            borderColor: DEAL_STATUSES[q.status]?.color ?? '#94A3B8',
+                          }}
+                        >
                           {DEAL_STATUSES[q.status]?.label ?? q.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-gray-500 text-sm">{new Date(q.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-gray-500 text-sm">
+                        {new Date(q.createdAt).toLocaleDateString()}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -216,24 +254,17 @@ const CmoDashboard = () => {
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <Bot className="h-4 w-4 text-brand-600" /> AI Marketing Insights
           </CardTitle>
-          <CardDescription>Anomalies and recommendations from live client & pipeline data</CardDescription>
+          <CardDescription>Anomalies and recommendations from live client &amp; pipeline data</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {isLoading ? (
-            [1, 2].map(i => <Skeleton key={i} className="h-24 w-full" />)
-          ) : (
-            (data?.insights ?? []).map(ins => <InsightCard key={ins.id} insight={ins} />)
-          )}
+          {isLoading
+            ? [1, 2].map(i => <Skeleton key={i} className="h-24 w-full" />)
+            : (data?.insights ?? []).map(ins => <InsightCard key={ins.id} insight={ins} />)
+          }
         </CardContent>
       </Card>
     </div>
   );
-};
-
-const DEAL_STATUSES: Record<string, { label: string; color: string }> = {
-  won: { label: 'Won', color: '#22C55E' },
-  pending: { label: 'Pending', color: '#F59E0B' },
-  lost: { label: 'Lost', color: '#EF4444' },
 };
 
 export default CmoDashboard;

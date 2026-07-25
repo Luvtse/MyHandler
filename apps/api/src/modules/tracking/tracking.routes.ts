@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient, ShipmentStatus } from '@prisma/client';
+import prisma from '../../utils/prisma';
+import { ShipmentStatus } from '@prisma/client';
 import { requireAuth } from '../../services/authService';
 
-const prisma = new PrismaClient();
 export const trackingRouter = Router();
 
 trackingRouter.use(requireAuth);

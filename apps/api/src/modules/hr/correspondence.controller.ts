@@ -1,9 +1,9 @@
 // apps/api/src/modules/hr/correspondence.controller.ts
 import { Request, Response } from 'express';
+import prisma from '../../utils/prisma';
 import { z } from 'zod';
-import { PrismaClient, CorrespondenceType } from '@prisma/client';
+import { CorrespondenceType } from '@prisma/client';
 
-const prisma = new PrismaClient();
 
 const createCorrespondenceSchema = z.object({
   employeeId: z.string(),

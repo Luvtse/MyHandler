@@ -1,8 +1,8 @@
-import { PrismaClient, ShipmentStatus } from '@prisma/client';
+import { ShipmentStatus } from '@prisma/client';
+import prisma from '../utils/prisma';
 import { Parser } from 'json2csv';
 import { format } from 'date-fns';
 
-const prisma = new PrismaClient();
 
 export interface ReportFilters {
   dateFrom?: string;

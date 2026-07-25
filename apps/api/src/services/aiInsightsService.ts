@@ -139,7 +139,7 @@ export async function getCfoInsights(): Promise<Insight[]> {
   const [invoicesOverdue, recentRevenue, prevRevenue] = await Promise.all([
     prisma.invoice.findMany({
       where: { status: 'OVERDUE' },
-      select: { totalAmount: true, paidAmount: true },
+      select: { totalAmount: true },
     }),
     prisma.shipment.aggregate({
       where: { createdAt: { gte: thirtyDaysAgo } },
@@ -152,7 +152,7 @@ export async function getCfoInsights(): Promise<Insight[]> {
   ]);
 
   const overdueAmount = invoicesOverdue.reduce(
-    (sum, inv) => sum + (inv.totalAmount - (inv.paidAmount ?? 0)),
+    (sum, inv) => sum + inv.totalAmount,
     0,
   );
   const recentRev = recentRevenue._sum.chargesAmount ?? 0;
@@ -292,7 +292,7 @@ export async function getCmoInsights(): Promise<Insight[]> {
   const [totalQuotations, wonQuotations, activeClients, totalClients] =
     await Promise.all([
       prisma.quotation.count(),
-      prisma.quotation.count({ where: { status: 'won' } }),
+      prisma.quotation.count({ where: { status: 'accepted' as any } }),
       prisma.client.count({ where: { status: 'active' } }),
       prisma.client.count(),
     ]);

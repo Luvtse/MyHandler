@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../../utils/prisma';
+
 import { z } from 'zod';
 import { PaymentProcessorFactory } from './payment-processors';
 
-const prisma = new PrismaClient();
 
 // Validation schema for creating a payment
 const createPaymentSchema = z.object({

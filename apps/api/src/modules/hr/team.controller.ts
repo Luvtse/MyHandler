@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
+import prisma from '../../utils/prisma';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
 const validateRequest = <S extends z.ZodTypeAny>(data: unknown, schema: S): z.infer<S> => schema.parse(data);
 
 // Validation schemas

@@ -1,20 +1,12 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ],
   "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"],
-      "@/packages/*": ["./packages/*"]
-    },
+    "strict": false,
     "noImplicitAny": false,
+    "noUnusedLocals": false,
     "noUnusedParameters": false,
     "skipLibCheck": true,
     "allowJs": true,
-    "noUnusedLocals": false,
-    "strictNullChecks": false
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true
   }
 }

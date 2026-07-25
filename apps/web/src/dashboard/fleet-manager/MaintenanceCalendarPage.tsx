@@ -1,4 +1,4 @@
-// @/dashboard/fleet/MaintenanceCalendarPage.tsx
+// @/dashboard/fleet-manager/MaintenanceCalendarPage.tsx
 import React, { useState, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -7,90 +7,103 @@ import interactionPlugin from '@fullcalendar/interaction';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Wrench, Truck, CalendarPlus } from 'lucide-react';
+import { Wrench, CalendarPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { apiService } from '@/lib/api/client';
 
-// Mock data — replace with API
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface MaintenanceEvent {
   id: string;
-  title: string;
   vehicleId: string;
   plateNumber: string;
-  start: string; // ISO date
-  end: string;
-  type: 'oil_change' | 'tire_rotation' | 'brake_service' | 'full_inspection' | 'emergency';
+  type: string;
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
-  assignedMechanic: string;
+  scheduledAt: string;
+  completedAt: string | null;
+  notes: string | null;
+  vendor: string | null;
 }
 
-const mockEvents: MaintenanceEvent[] = [
-  {
-    id: 'evt-001',
-    title: 'Full Inspection - ADD-1234',
-    vehicleId: 'V001',
-    plateNumber: 'ADD-1234',
-    start: '2026-01-10T09:00:00',
-    end: '2026-01-10T11:00:00',
-    type: 'full_inspection',
-    status: 'scheduled',
-    assignedMechanic: 'Yohannes T.',
-  },
-  {
-    id: 'evt-002',
-    title: 'Brake Service - HAW-5678',
-    vehicleId: 'V002',
-    plateNumber: 'HAW-5678',
-    start: '2026-01-10T14:00:00',
-    end: '2026-01-10T15:30:00',
-    type: 'brake_service',
-    status: 'in_progress',
-    assignedMechanic: 'Selamawit G.',
-  },
-];
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const getStatusColor = (status: MaintenanceEvent['status']) => {
-  switch (status) {
-    case 'scheduled': return 'bg-blue-100 text-blue-800';
-    case 'in_progress': return 'bg-yellow-100 text-yellow-800';
-    case 'completed': return 'bg-green-100 text-green-800';
-    case 'cancelled': return 'bg-red-100 text-red-800';
-    default: return 'bg-muted';
-  }
+const STATUS_COLORS: Record<string, string> = {
+  scheduled:   '#dbeafe',
+  in_progress: '#fde68a',
+  completed:   '#bbf7d0',
+  cancelled:   '#fecaca',
 };
 
-const getTypeIcon = (type: MaintenanceEvent['type']) => {
-  switch (type) {
-    case 'emergency': return '🚨';
-    case 'full_inspection': return '🔍';
-    default: return '🔧';
-  }
+const STATUS_BADGE: Record<string, string> = {
+  scheduled:   'bg-blue-100 text-blue-800',
+  in_progress: 'bg-yellow-100 text-yellow-800',
+  completed:   'bg-green-100 text-green-800',
+  cancelled:   'bg-red-100 text-red-800',
 };
+
+const TYPE_ICON: Record<string, string> = {
+  emergency:      '🚨',
+  full_inspection:'🔍',
+  oil_change:     '🛢️',
+  tire_rotation:  '🔄',
+  brake_service:  '🛑',
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 const MaintenanceCalendarPage = () => {
   const navigate = useNavigate();
-  const [events, setEvents] = useState<MaintenanceEvent[]>(mockEvents);
+  const [events, setEvents] = useState<MaintenanceEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      setLoading(true);
+      try {
+        const res = await apiService.request<MaintenanceEvent[]>({
+          url: '/fleet/maintenance',
+          method: 'GET',
+        });
+        if (res.success && Array.isArray(res.data)) {
+          setEvents(res.data);
+        } else {
+          throw new Error((res as any).message ?? 'Failed to load maintenance events');
+        }
+      } catch (err) {
+        console.error('[MaintenanceCalendar] Fetch failed:', err);
+        toast.error('Could not load maintenance schedule');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEvents();
+  }, []);
 
   const handleDateSelect = (selectInfo: any) => {
-    const confirm = window.confirm('Would you like to schedule a new maintenance?');
-    if (confirm) {
-      // Redirect to schedule with pre-filled date
-      navigate(`/dashboard/fleet/schedule-maintenance?start=${selectInfo.startStr}&end=${selectInfo.endStr}`);
+    const ok = window.confirm('Schedule a new maintenance starting here?');
+    if (ok) {
+      navigate(
+        `/dashboard/fleet/schedule-maintenance?start=${selectInfo.startStr}&end=${selectInfo.endStr}`,
+      );
     }
   };
 
   const handleEventClick = (clickInfo: any) => {
-    const event = events.find(e => e.id === clickInfo.event.id);
-    if (event) {
-      navigate(`/dashboard/fleet/${event.vehicleId}`);
-    }
+    const evt = events.find(e => e.id === clickInfo.event.id);
+    if (evt?.vehicleId) navigate(`/dashboard/fleet/${evt.vehicleId}`);
   };
 
-  // Fetch real events from API (replace mock)
-  useEffect(() => {
-    // const fetchEvents = async () => { ... }
-    // fetchEvents();
-  }, []);
+  const calendarEvents = events.map(e => ({
+    id: e.id,
+    title: `${TYPE_ICON[e.type] ?? '🔧'} ${e.plateNumber || e.vehicleId}`,
+    start: e.scheduledAt,
+    end: e.completedAt ?? undefined,
+    backgroundColor: STATUS_COLORS[e.status] ?? '#e2e8f0',
+    borderColor: 'transparent',
+    textColor: '#1e293b',
+    extendedProps: e,
+  }));
 
   return (
     <div className="space-y-6">
@@ -108,7 +121,9 @@ const MaintenanceCalendarPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>Maintenance Schedule</CardTitle>
-          <CardDescription>Drag to reschedule • Click to view vehicle</CardDescription>
+          <CardDescription>
+            {loading ? 'Loading…' : `${events.length} record${events.length !== 1 ? 's' : ''} · Click to view vehicle · Click date to schedule`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-hidden rounded-md border">
@@ -116,27 +131,17 @@ const MaintenanceCalendarPage = () => {
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
               initialView="timeGridWeek"
               headerToolbar={{
-                left: 'prev,next today',
+                left:   'prev,next today',
                 center: 'title',
-                right: 'dayGridMonth,timeGridWeek,timeGridDay',
+                right:  'dayGridMonth,timeGridWeek,timeGridDay',
               }}
-              events={events.map(e => ({
-                id: e.id,
-                title: `${getTypeIcon(e.type)} ${e.plateNumber}`,
-                start: e.start,
-                end: e.end,
-                backgroundColor: e.status === 'in_progress' ? '#fde68a' :
-                              e.status === 'completed' ? '#bbf7d0' :
-                              e.status === 'cancelled' ? '#fecaca' : '#dbeafe',
-                borderColor: 'transparent',
-                textColor: '#1e293b',
-                extendedProps: e,
-              }))}
+              events={calendarEvents}
               selectable={true}
               select={handleDateSelect}
               eventClick={handleEventClick}
               nowIndicator={true}
               height="auto"
+              loading={isLoading => setLoading(isLoading)}
             />
           </div>
         </CardContent>
@@ -148,7 +153,7 @@ const MaintenanceCalendarPage = () => {
           <div className="flex flex-wrap gap-4">
             {(['scheduled', 'in_progress', 'completed', 'cancelled'] as const).map(status => (
               <div key={status} className="flex items-center gap-2">
-                <Badge className={getStatusColor(status)}>{status.replace('_', ' ')}</Badge>
+                <Badge className={STATUS_BADGE[status]}>{status.replace('_', ' ')}</Badge>
               </div>
             ))}
           </div>

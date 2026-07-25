@@ -1,10 +1,10 @@
 // apps/api/src/modules/hr/leave.controller.ts
 import { Request, Response } from 'express';
-import { PrismaClient, LeaveType, Prisma, LeaveStatus } from '@prisma/client';
+import prisma from '../../utils/prisma';
+import { LeaveType, Prisma, LeaveStatus } from '@prisma/client';
 import { z } from 'zod';
 import { emailService } from '../../services/emailService';
 
-const prisma = new PrismaClient();
 
 // Validation schemas
 const createLeaveSchema = z.object({

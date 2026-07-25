@@ -1,11 +1,11 @@
 import { Router } from 'express';
+import prisma from '../../utils/prisma';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { PrismaClient } from '@prisma/client';
+
 import { requireAuth } from '../../services/authService';
 
-const prisma = new PrismaClient();
 const router = Router();
 const uploadsDir = path.resolve(process.cwd(), 'server', 'uploads');
 

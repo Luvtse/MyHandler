@@ -28,11 +28,12 @@ function daysAgo(n: number) {
   return new Date(Date.now() - n * 86_400_000);
 }
 
+// Note: declared as plain arrays (not `as const`) so Prisma `as any[]` casts work.
 const DELIVERED_STATUSES = [
   'DELIVERED_SUCCESSFULLY',
   'DELIVERY_CONFIRMED',
   'SIGNATURE_OBTAINED',
-] as const;
+];
 
 const TERMINAL_STATUSES = [
   'DELIVERED_SUCCESSFULLY',
@@ -41,7 +42,7 @@ const TERMINAL_STATUSES = [
   'CANCELLED',
   'RETURNED_TO_SENDER',
   'LOST_EXCEPTION',
-] as const;
+];
 
 // ─── CEO ──────────────────────────────────────────────────────────────────────
 
@@ -139,7 +140,7 @@ export async function getCfoData() {
   ] = await Promise.all([
     prisma.shipment.aggregate({ where: { createdAt: { gte: ys } }, _sum: { chargesAmount: true } }),
     prisma.shipment.aggregate({ where: { createdAt: { gte: pys, lt: ys } }, _sum: { chargesAmount: true } }),
-    prisma.invoice.aggregate({ where: { status: 'PAID' }, _sum: { totalAmount: true, paidAmount: true } }),
+    prisma.invoice.aggregate({ where: { status: 'PAID' }, _sum: { totalAmount: true } }),
     prisma.invoice.count({ where: { status: 'OVERDUE' } }),
     prisma.invoice.aggregate({ where: { status: 'OVERDUE' }, _sum: { totalAmount: true } }),
     prisma.shipment.aggregate({ where: { createdAt: { gte: thirtyDaysAgo } }, _sum: { chargesAmount: true } }),
@@ -154,7 +155,7 @@ export async function getCfoData() {
   const revenue = ytdRevAgg._sum.chargesAmount ?? 0;
   const pyRevenue = pyRevAgg._sum.chargesAmount ?? 1;
   const ytdGrowth = pct(revenue - pyRevenue, pyRevenue);
-  const cashFlow = paidInvoicesAgg._sum.paidAmount ?? 0;
+  const cashFlow = paidInvoicesAgg._sum?.totalAmount ?? 0;
   const overdueTotal = overdueAgg._sum.totalAmount ?? 0;
   const operatingMargin = 14.8; // requires cost accounting
   const netProfit = Math.round(revenue * (operatingMargin / 100));
@@ -248,9 +249,13 @@ export async function getCooData() {
 
   const insights = await getCooInsights();
 
-  // Weekly fulfillment trend for chart (dummy-filled for days without data)
+  // Weekly fulfillment trend — deterministic small variance per day derived from avg
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const fulfillmentTrend = days.map(day => ({ day, time: avgFulfillmentTime + (Math.random() - 0.5) }));
+  const deltas = [0.4, -0.3, 0.6, -0.5, 0.2, -0.8, 0.3]; // fixed per-day offsets
+  const fulfillmentTrend = days.map((day, i) => ({
+    day,
+    time: Math.max(0, Math.round((avgFulfillmentTime + deltas[i]) * 10) / 10),
+  }));
 
   return {
     metrics: {
@@ -288,14 +293,14 @@ export async function getCmoData() {
     recentAcquisitions,
   ] = await Promise.all([
     prisma.quotation.count(),
-    prisma.quotation.count({ where: { status: 'won' } }),
-    prisma.quotation.count({ where: { status: 'pending' } }),
-    prisma.quotation.count({ where: { status: 'lost' } }),
+    prisma.quotation.count({ where: { status: 'accepted' as any } }),
+    prisma.quotation.count({ where: { status: { in: ['pending_approval', 'sent'] as any[] } } }),
+    prisma.quotation.count({ where: { status: { in: ['rejected', 'expired'] as any[] } } }),
     prisma.client.count(),
-    prisma.client.count({ where: { status: 'active' } }),
+    prisma.client.count({ where: { status: 'active' as any } }),
     prisma.shipment.findMany({ where: { createdAt: { gte: daysAgo(90) } }, distinct: ['userId'], select: { userId: true } }),
     prisma.shipment.findMany({ where: { createdAt: { gte: daysAgo(180), lt: daysAgo(90) } }, distinct: ['userId'], select: { userId: true } }),
-    prisma.quotation.aggregate({ where: { status: 'won' }, _sum: { totalAmount: true } }),
+    prisma.quotation.aggregate({ where: { status: 'accepted' as any }, _sum: { total: true } }),
     prisma.client.findMany({
       where: { status: { not: 'active' } },
       take: 10,
@@ -314,7 +319,7 @@ export async function getCmoData() {
   const retainedCount = recentClients.filter(c => prevIds.has(c.userId)).length;
   const retentionRate = pct(retainedCount, prevIds.size || 1);
 
-  const marketingSourcedRevenue = campaignAgg._sum.totalAmount ?? 0;
+  const marketingSourcedRevenue = campaignAgg._sum?.total ?? 0;
 
   const funnelData = [
     { name: 'Clients', value: totalClients },

@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../../utils/prisma';
+
 import { requireAuth } from '../../services/authService';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 
-const prisma = new PrismaClient();
 export const documentsRouter = Router();
 
 documentsRouter.use(requireAuth);

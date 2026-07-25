@@ -1,3 +1,5 @@
 - [Blocked packages](blocked-packages.md) — several npm packages are blocked by Replit security policy; workarounds documented here.
 - [Prisma generate workflow](prisma-generate-workflow.md) — Prisma v5 is used (not v7); must run prisma generate after schema changes, then restart the API workflow.
 - [Monorepo install](monorepo-install.md) — npm overrides must be in root package.json; run npm install from workspace root.
+- [Schema field names](schema-field-names.md) — Invoice has no paidAmount (only totalAmount); Quotation has no won/pending/lost status (use accepted/pending_approval/sent/rejected/expired); Quotation sum aggregate uses `total` not `totalAmount`.
+- [Shared Prisma instance](shared-prisma.md) — All modules must import from `../../utils/prisma` (or `../utils/prisma` for services), never `new PrismaClient()`.

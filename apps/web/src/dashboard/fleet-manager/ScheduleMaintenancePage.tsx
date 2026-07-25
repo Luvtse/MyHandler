@@ -1,4 +1,4 @@
-// @/dashboard/fleet/ScheduleMaintenancePage.tsx
+// @/dashboard/fleet-manager/ScheduleMaintenancePage.tsx
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -9,19 +9,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiService } from '@/lib/api/client';
 
 const maintenanceTypes = [
-  { value: 'oil_change', label: 'Oil Change' },
-  { value: 'tire_rotation', label: 'Tire Rotation' },
-  { value: 'brake_service', label: 'Brake Service' },
-  { value: 'full_inspection', label: 'Full Inspection' },
-  { value: 'other', label: 'Other' },
+  { value: 'oil_change',       label: 'Oil Change' },
+  { value: 'tire_rotation',    label: 'Tire Rotation' },
+  { value: 'brake_service',    label: 'Brake Service' },
+  { value: 'full_inspection',  label: 'Full Inspection' },
+  { value: 'other',            label: 'Other' },
 ];
 
 const ScheduleMaintenancePage = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
 
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     type: 'full_inspection',
     scheduledDate: '',
@@ -37,21 +39,41 @@ const ScheduleMaintenancePage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Basic validation
+
     if (!formData.scheduledDate || !formData.mileageAtService) {
       toast.error('Please fill in required fields');
       return;
     }
+    if (!vehicleId) {
+      toast.error('No vehicle selected');
+      return;
+    }
 
+    setSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      const res = await apiService.request({
+        url: '/fleet/maintenance',
+        method: 'POST',
+        data: {
+          vehicleId,
+          type: formData.type,
+          scheduledDate: formData.scheduledDate,
+          mileageAtService: Number(formData.mileageAtService),
+          notes: formData.notes || null,
+          vendor: formData.vendor || null,
+          estimatedCost: formData.estimatedCost ? Number(formData.estimatedCost) : null,
+        },
+      });
+
+      if (!res.success) throw new Error((res as any).message ?? 'Failed to schedule maintenance');
+
       toast.success('Maintenance scheduled successfully!');
-      navigate(`/dashboard/fleet/${vehicleId}`);
+      navigate(vehicleId ? `/dashboard/fleet/${vehicleId}` : '/dashboard/fleet');
     } catch (err) {
-      toast.error('Failed to schedule maintenance');
+      toast.error((err as Error).message || 'Failed to schedule maintenance');
+      console.error('[ScheduleMaintenance]', err);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -59,7 +81,9 @@ const ScheduleMaintenancePage = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Schedule Maintenance</h1>
-        <p className="text-muted-foreground">Plan service for vehicle {vehicleId}</p>
+        <p className="text-muted-foreground">
+          {vehicleId ? `Plan service for vehicle ${vehicleId}` : 'Plan a new service'}
+        </p>
       </div>
 
       <Card>
@@ -70,6 +94,7 @@ const ScheduleMaintenancePage = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
               <div className="space-y-2">
                 <Label htmlFor="type">Service Type *</Label>
                 <Select value={formData.type} onValueChange={v => handleChange('type', v)}>
@@ -78,9 +103,7 @@ const ScheduleMaintenancePage = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {maintenanceTypes.map(t => (
-                      <SelectItem key={t.value} value={t.value}>
-                        {t.label}
-                      </SelectItem>
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -145,10 +168,12 @@ const ScheduleMaintenancePage = () => {
             </div>
 
             <div className="flex gap-3 pt-2">
-              <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+              <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={submitting}>
                 Cancel
               </Button>
-              <Button type="submit">Schedule Maintenance</Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Scheduling…' : 'Schedule Maintenance'}
+              </Button>
             </div>
           </form>
         </CardContent>

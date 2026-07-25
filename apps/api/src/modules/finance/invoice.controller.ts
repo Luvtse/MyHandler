@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../../utils/prisma';
+
 import { z } from 'zod';
 
-const prisma = new PrismaClient();
 
 // Validation schema for creating an invoice
 const createInvoiceSchema = z.object({

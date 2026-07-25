@@ -16,6 +16,7 @@
     "@mui/icons-material": "^7.3.6",
     "@mui/material": "^7.3.6",
     "@radix-ui/react-accordion": "^1.2.12",
+    "@radix-ui/react-menubar": "^1.1.16",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.8",
     "@radix-ui/react-avatar": "^1.1.11",
@@ -70,8 +71,8 @@
   "devDependencies": {
     "@types/jsbarcode": "^3.11.4",
     "@types/qrcode": "^1.5.6",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.0.0",
     "autoprefixer": "^10.4.23",
     "postcss": "^8.5.6",

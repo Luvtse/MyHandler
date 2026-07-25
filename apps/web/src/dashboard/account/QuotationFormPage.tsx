@@ -182,7 +182,7 @@ const QuotationFormPage = () => {
         parentId: null,
         createdBy: 'Account Manager',
         updatedAt: new Date().toISOString(),
-      } as import("d:/PC/Zero/Lwebapp/apps/web/src/types/account").QuotationWithClient);
+      } as import('@/types/account').QuotationWithClient);
       pdf.save(`quotation-${formData.quotationNumber}.pdf`);
       toast.success('PDF downloaded successfully!');
     } catch (error) {
