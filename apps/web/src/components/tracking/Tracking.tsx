@@ -178,7 +178,7 @@ const Tracking = () => {
                   </div>
                   <h2 className="text-xl font-bold text-gray-900 mb-2">Enter a tracking number to begin</h2>
                   <p className="text-gray-500 max-w-md leading-relaxed">
-                    Enter your GoodsHandler tracking number to get detailed information about your shipment status and location.
+                    Enter your WORIYA EXPRESS tracking number to get detailed information about your shipment status and location.
                   </p>
                 </div>
               )}

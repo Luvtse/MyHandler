@@ -136,7 +136,7 @@ const Login = () => {
               </div>
               <h1 className="mt-4 text-2xl font-bold text-gray-900">Welcome back</h1>
               <p className="mt-2 text-sm text-gray-600">
-                Sign in to your GoodsHandler account
+                Sign in to your WORIYA EXPRESS account
               </p>
             </div>
             

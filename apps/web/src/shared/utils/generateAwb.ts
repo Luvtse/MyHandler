@@ -148,7 +148,7 @@ function buildCopy(
         columns: [
           {
             stack: [
-              { text: 'GoodsHandler', style: 'companyName' },
+              { text: 'WORIYA EXPRESS', style: 'companyName' },
               { text: 'Express Logistics', style: 'companyTagline' },
             ],
           },

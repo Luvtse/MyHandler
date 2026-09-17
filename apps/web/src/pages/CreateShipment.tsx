@@ -423,7 +423,7 @@ const CreateShipmentPage = () => {
           date: new Date(),
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           companyInfo: {
-            name: 'GoodsHandler',
+            name: 'WORIYA EXPRESS',
             address: '123 Logistics Way, Shipping City, SC 12345',
             phone: '+1 (800) 123-4567',
             email: 'info@goodshandler.com',
@@ -479,7 +479,7 @@ const CreateShipmentPage = () => {
           paymentInfo: {
             method: paymentType === 'account' ? 'Account' : paymentType === 'prepaid' ? 'Prepaid' : 'Collect',
             bankName: 'Commercial Bank of Ethiopia',
-            accountName: 'GoodsHandler',
+            accountName: 'WORIYA EXPRESS',
             accountNumber: '1000123456789',
             swiftCode: 'CBETETAA',
           },

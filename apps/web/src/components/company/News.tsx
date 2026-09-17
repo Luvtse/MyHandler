@@ -14,17 +14,17 @@ interface NewsItem {
 
 const newsItems: NewsItem[] = [
   {
-    title: 'GoodsHandler Expands International Network',
+    title: 'WORIYA EXPRESS Expands International Network',
     date: '2024-02-15',
     category: 'Company News',
-    summary: 'GoodsHandler announces expansion of its international shipping network to 20 new countries, enhancing global delivery capabilities.',
+    summary: 'WORIYA EXPRESS announces expansion of its international shipping network to 20 new countries, enhancing global delivery capabilities.',
     icon: <Globe className="h-6 w-6 text-brand" />
   },
   {
     title: 'Awarded Best Logistics Provider 2024',
     date: '2024-01-30',
     category: 'Awards',
-    summary: 'GoodsHandler recognized as the leading logistics provider for excellence in service quality and customer satisfaction.',
+    summary: 'WORIYA EXPRESS recognized as the leading logistics provider for excellence in service quality and customer satisfaction.',
     icon: <Award className="h-6 w-6 text-brand" />
   },
   {
@@ -51,7 +51,7 @@ const News = () => {
 
           <div className="prose prose-lg max-w-none mb-12">
             <p className="text-xl text-gray-600">
-              Stay updated with the latest news, achievements, and developments at GoodsHandler.
+              Stay updated with the latest news, achievements, and developments at WORIYA EXPRESS.
             </p>
           </div>
 
@@ -86,7 +86,7 @@ const News = () => {
           <div className="mt-12 bg-gray-50 rounded-lg p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Media Inquiries</h2>
             <p className="text-gray-600 mb-6">
-              For press inquiries, interview requests, or additional information about GoodsHandler,
+              For press inquiries, interview requests, or additional information about WORIYA EXPRESS,
               please contact our media relations team.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">

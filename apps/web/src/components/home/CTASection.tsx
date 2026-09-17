@@ -18,7 +18,7 @@ const CTASection = () => {
                 Ready to ship with confidence?
               </h2>
               <p className="text-blue-100/90 text-lg text-pretty">
-                Join thousands of satisfied customers who trust GoodsHandler for their logistics needs. Sign up now and experience the difference.
+                Join thousands of satisfied customers who trust WORIYA EXPRESS for their logistics needs. Sign up now and experience the difference.
               </p>
             </div>
 

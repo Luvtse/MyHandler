@@ -15,13 +15,13 @@ interface EmailTemplate { subject: string; text: string; html: string }
 
 const BRAND_BLUE = '#1A3C8F';
 const BRAND_YELLOW = '#FFC107';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://goodshandler.com';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://woriyaexpress.com';
 
 function header(title: string): string {
   return `
   <div style="background:${BRAND_BLUE};padding:24px 32px;border-radius:8px 8px 0 0;">
     <h1 style="color:#fff;margin:0;font-family:Inter,Arial,sans-serif;font-size:20px;font-weight:700;">
-      GoodsHandler
+      WORIYA EXPRESS
     </h1>
     <p style="color:#CBD5F0;margin:4px 0 0;font-family:Inter,Arial,sans-serif;font-size:13px;">
       ${title}
@@ -33,7 +33,7 @@ function footer(): string {
   return `
   <div style="background:#F8FAFC;border-top:1px solid #E2E8F0;padding:16px 32px;border-radius:0 0 8px 8px;">
     <p style="color:#94A3B8;font-family:Inter,Arial,sans-serif;font-size:12px;margin:0;text-align:center;">
-      © ${new Date().getFullYear()} GoodsHandler &nbsp;·&nbsp;
+      © ${new Date().getFullYear()} WORIYA EXPRESS &nbsp;·&nbsp;
       <a href="${FRONTEND_URL}/terms" style="color:#94A3B8;">Terms</a>
       &nbsp;·&nbsp;
       <a href="${FRONTEND_URL}/support" style="color:#94A3B8;">Support</a>
@@ -91,7 +91,7 @@ class EmailService {
   async sendEmail(options: EmailOptions): Promise<void> {
     try {
       await this.transporter.sendMail({
-        from: `"GoodsHandler" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+        from: `"WORIYA EXPRESS" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
         ...options,
       });
       console.log('[Email] Sent to:', options.to, '|', options.subject);
@@ -165,7 +165,7 @@ class EmailService {
       // ── Shipment created ────────────────────────────────────────────────────
       SHIPMENT_CREATED: {
         subject: `Shipment Booked – ${data.reference || 'AWB Ready'}`,
-        text: `Hi ${userName},\n\nYour shipment ${data.reference} has been created.\nOrigin: ${data.origin}\nDestination: ${data.destination}\nService: ${data.serviceType || 'Standard'}\n\nTrack it at ${FRONTEND_URL}/tracking\n\n– GoodsHandler`,
+        text: `Hi ${userName},\n\nYour shipment ${data.reference} has been created.\nOrigin: ${data.origin}\nDestination: ${data.destination}\nService: ${data.serviceType || 'Standard'}\n\nTrack it at ${FRONTEND_URL}/tracking\n\n– WORIYA EXPRESS`,
         html: wrap(
           'Shipment Created',
           `<p style="font-family:Inter,Arial,sans-serif;color:#0F172A;margin:0 0 16px;">Hi <strong>${userName}</strong>,</p>
@@ -185,7 +185,7 @@ class EmailService {
       // ── Shipment delivered ──────────────────────────────────────────────────
       SHIPMENT_DELIVERED: {
         subject: `Delivered ✓ – ${data.reference || 'Your Shipment'}`,
-        text: `Hi ${userName},\n\nGreat news! Your shipment ${data.reference} has been delivered.\nDelivered to: ${data.destination}\nDelivery time: ${data.deliveredAt || 'N/A'}\n\nThank you for choosing GoodsHandler.\n– GoodsHandler`,
+        text: `Hi ${userName},\n\nGreat news! Your shipment ${data.reference} has been delivered.\nDelivered to: ${data.destination}\nDelivery time: ${data.deliveredAt || 'N/A'}\n\nThank you for choosing WORIYA EXPRESS.\n– WORIYA EXPRESS`,
         html: wrap(
           'Shipment Delivered',
           `<p style="font-family:Inter,Arial,sans-serif;color:#0F172A;margin:0 0 16px;">Hi <strong>${userName}</strong>,</p>
@@ -199,7 +199,7 @@ class EmailService {
             <tr style="border-top:1px solid #F1F5F9;"><td style="padding:8px 0;color:#64748B;">Status</td><td style="padding:8px 0;">${pill('Delivered', '#16A34A')}</td></tr>
           </table>
           <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:16px;margin-top:20px;">
-            <p style="font-family:Inter,Arial,sans-serif;color:#15803D;font-size:14px;margin:0;font-weight:600;">Thank you for choosing GoodsHandler!</p>
+            <p style="font-family:Inter,Arial,sans-serif;color:#15803D;font-size:14px;margin:0;font-weight:600;">Thank you for choosing WORIYA EXPRESS!</p>
             <p style="font-family:Inter,Arial,sans-serif;color:#16A34A;font-size:13px;margin:6px 0 0;">Fast. Reliable. Affordable.</p>
           </div>
           ${cta('View Shipment Details', `${FRONTEND_URL}/tracking?awb=${data.reference}`)}`,
