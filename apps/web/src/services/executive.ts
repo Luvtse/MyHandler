@@ -1,6 +1,6 @@
 /**
  * Executive Dashboard Service
- * Fetches real-time C-suite metrics from the GoodsHandler API.
+ * Fetches real-time C-suite metrics from the WORIYA EXPRESS API.
  */
 import { apiService } from '@/lib/api/client';
 

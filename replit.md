@@ -1,4 +1,4 @@
-# GoodsHandler
+# WORIYA EXPRESS
 
 A full-stack logistics web application for shipment tracking, delivery management, and customer/driver/admin workflows.
 
@@ -55,7 +55,7 @@ npx prisma db seed       # seed initial data
 
 ## Brand
 
-- **Name:** GoodsHandler
+- **Name:** WORIYA EXPRESS
 - **Primary:** Bold Blue `#1A3C8F`
 - **Accent:** Bold Yellow `#FFC107`
 - **Typography:** Inter (headings + body), JetBrains Mono (codes/tracking numbers)

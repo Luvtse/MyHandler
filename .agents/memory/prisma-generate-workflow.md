@@ -13,7 +13,7 @@ description: How Prisma is set up and what to do after schema changes
 
 1. Run `cd apps/api && npx prisma generate` — regenerates `@prisma/client` types.
 2. Run `cd apps/api && npx prisma db push` (dev) or `npx prisma migrate deploy` (prod) — applies the schema to the database.
-3. Restart the `GoodsHandler API` workflow — the running ts-node-dev process caches the old client.
+3. Restart the `WORIYA EXPRESS API` workflow — the running ts-node-dev process caches the old client.
 
 **Why:** The API workflow must be restarted after `prisma generate` because ts-node-dev imports the module at startup. If the workflow starts before `prisma generate` runs, it throws "PrismaClient did not initialize yet."
 

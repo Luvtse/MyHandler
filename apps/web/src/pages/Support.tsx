@@ -140,7 +140,7 @@ const Support = () => {
                     <Mail className="h-5 w-5 text-brand mt-1 mr-3" />
                     <div>
                       <p className="font-medium">Email Support</p>
-                      <p className="text-gray-600">support@goodshandler.com</p>
+                      <p className="text-gray-600">support@woriyaexpress.com</p>
                       <p className="text-sm text-gray-500">Response within 24 hours</p>
                     </div>
                   </div>

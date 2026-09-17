@@ -37,7 +37,7 @@ const Terms = () => {
             <section className="mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">1. Service Agreement</h2>
               <p className="text-gray-600 mb-4">
-                These terms and conditions govern the use of logistics and shipping services provided by GoodsHandler.
+                These terms and conditions govern the use of logistics and shipping services provided by WORIYA EXPRESS.
                 By using our services, you enter into a binding agreement with us subject to these terms.
               </p>
               <ul className="list-disc list-inside text-gray-600 space-y-2">
