@@ -29,7 +29,7 @@ const FeaturesSection = () => {
     <section className="py-20 bg-white">
       <div className="logistics-container">
         <div className="text-center mb-14 max-w-2xl mx-auto">
-          <span className="badge-blue mb-4 inline-block">Why GoodsHandler</span>
+          <span className="badge-blue mb-4 inline-block">Why WORIYA EXPRESS</span>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 text-balance">
             Logistics built on speed, trust, and precision
           </h2>

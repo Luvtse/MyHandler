@@ -94,7 +94,7 @@ const DashboardLayout: React.FC = () => {
               {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </Button>
             <Link to="/" className="flex items-center gap-2">
-              <img src="/logo.png" alt="GoodsHandler" className="h-9 w-auto" />
+              <img src="/logo.png" alt="WORIYA EXPRESS" className="h-9 w-auto" />
             </Link>
             <span className="hidden sm:inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand">
               {formatRole(user?.role)}

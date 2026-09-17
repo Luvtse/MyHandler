@@ -11,7 +11,7 @@ const Footer = () => {
           <div className="flex flex-col space-y-4">
             <div className="flex items-center">
               <span className="inline-flex items-center rounded-lg bg-white px-3 py-2">
-                <img src="/logo.png" alt="GoodsHandler Logo" className="h-9 w-auto" />
+                <img src="/logo.png" alt="WORIYA EXPRESS Logo" className="h-9 w-auto" />
               </span>
             </div>
             <p className="text-blue-100/70 text-sm leading-relaxed">
@@ -19,7 +19,7 @@ const Footer = () => {
             </p>
             <div className="flex items-center space-x-3 mt-2">
               <a
-                href="https://facebook.com/goodshandler"
+                href="https://facebook.com/woriyaexpress"
                 aria-label="Visit our Facebook"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -30,7 +30,7 @@ const Footer = () => {
                 </svg>
               </a>
               <a
-                href="https://twitter.com/goodshandler"
+                href="https://twitter.com/woriyaexpress"
                 aria-label="Visit our Twitter"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -41,7 +41,7 @@ const Footer = () => {
                 </svg>
               </a>
               <a
-                href="https://github.com/goodshandler"
+                href="https://github.com/woriyaexpress"
                 aria-label="Visit our GitHub"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -89,7 +89,7 @@ const Footer = () => {
               </li>
               <li className="flex items-center">
                 <Mail className="h-5 w-5 text-brand-yellow mr-2 flex-shrink-0" />
-                <span className="text-blue-100/70">contact@goodshandler.com</span>
+                <span className="text-blue-100/70">contact@woriyaexpress.com</span>
               </li>
             </ul>
           </div>
@@ -97,7 +97,7 @@ const Footer = () => {
 
         <div className="mt-12 pt-6 border-t border-white/10">
           <p className="text-sm text-blue-100/60 text-center">
-            &copy; {new Date().getFullYear()} GoodsHandler. All rights reserved.
+            &copy; {new Date().getFullYear()} WORIYA EXPRESS. All rights reserved.
           </p>
         </div>
       </div>

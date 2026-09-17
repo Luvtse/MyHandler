@@ -64,7 +64,7 @@ const Header = () => {
             <Link to="/" className="shrink-0">
               <img 
                 src="/logo.png" 
-                alt="GoodsHandler Logo" 
+                alt="WORIYA EXPRESS Logo" 
                 className="h-14 w-auto" 
               />
             </Link>

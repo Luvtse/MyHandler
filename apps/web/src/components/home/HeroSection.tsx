@@ -28,7 +28,7 @@ const HeroSection = () => {
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.08] tracking-tight text-balance">
               Move goods faster with{' '}
-              <span className="text-brand-yellow">GoodsHandler</span>
+              <span className="text-brand-yellow">WORIYA EXPRESS</span>
             </h1>
 
             <p className="text-lg md:text-xl text-blue-100/90 max-w-xl text-pretty leading-relaxed">

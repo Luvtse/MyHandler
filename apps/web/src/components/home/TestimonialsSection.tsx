@@ -48,21 +48,21 @@ const TestimonialsSection = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Testimonial 
-            quote="GoodsHandler has transformed how we handle our shipping needs. Their tracking system is incredibly reliable, and deliveries are always on time."
+            quote="WORIYA EXPRESS has transformed how we handle our shipping needs. Their tracking system is incredibly reliable, and deliveries are always on time."
             author="Sarah Johnson"
             company="Fashion Retailer"
             image="https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Nnx8d29tYW4lMjBwb3J0cmFpdHxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=900&q=60"
           />
           
           <Testimonial 
-            quote="We've been using GoodsHandler for our international shipments for over two years now. Their customs expertise has saved us countless headaches."
+            quote="We've been using WORIYA EXPRESS for our international shipments for over two years now. Their customs expertise has saved us countless headaches."
             author="Michael Chen"
             company="Tech Innovations Inc."
             image="https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8OXx8YnVzaW5lc3MlMjBtYW58ZW58MHx8MHx8&auto=format&fit=crop&w=900&q=60"
           />
           
           <Testimonial 
-            quote="The customer service at GoodsHandler is exceptional. When we had a delivery emergency, they went above and beyond to ensure our package arrived on time."
+            quote="The customer service at WORIYA EXPRESS is exceptional. When we had a delivery emergency, they went above and beyond to ensure our package arrived on time."
             author="Emma Rodriguez"
             company="Medical Supplies Co."
             image="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8NXx8cHJvZmVzc2lvbmFsJTIwd29tYW58ZW58MHx8MHx8&auto=format&fit=crop&w=900&q=60"
