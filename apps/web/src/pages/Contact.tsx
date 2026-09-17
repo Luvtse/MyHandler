@@ -144,7 +144,7 @@ const Contact = () => {
                     <Mail className="h-6 w-6 text-brand mt-1 mr-3" />
                     <div>
                       <h4 className="font-medium text-gray-900 mb-1">Email</h4>
-                      <p className="text-gray-600">contact@goodshandler.com</p>
+                      <p className="text-gray-600">contact@woriyaexpress.com</p>
                     </div>
                   </div>
 

@@ -426,8 +426,8 @@ const CreateShipmentPage = () => {
             name: 'WORIYA EXPRESS',
             address: '123 Logistics Way, Shipping City, SC 12345',
             phone: '+1 (800) 123-4567',
-            email: 'info@goodshandler.com',
-            website: 'www.goodshandler.com',
+            email: 'info@woriyaexpress.com',
+            website: 'www.woriyaexpress.com',
             vatNumber: 'VAT123456789',
           },
           customerInfo: {

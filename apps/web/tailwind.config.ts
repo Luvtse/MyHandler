@@ -59,7 +59,7 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
 
-        /* GoodsHandler brand palette (static HEX) */
+        /* WORIYA EXPRESS brand palette (static HEX) */
         brand: {
           DEFAULT: "#1A3C8F",   /* Bold Blue — primary */
           mid:     "#2756C5",   /* Mid Blue  — hover/interactive */

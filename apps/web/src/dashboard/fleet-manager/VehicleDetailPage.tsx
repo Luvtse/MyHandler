@@ -240,7 +240,7 @@ const VehicleDetailPage = () => {
                     'BEGIN:VCALENDAR',
                     'VERSION:2.0',
                     'BEGIN:VEVENT',
-                    `UID:${vehicle.id}@fleet.goodshandler.com`,
+                    `UID:${vehicle.id}@fleet.woriyaexpress.com`,
                     `DTSTART:${start.toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
                     `DTEND:${end.toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
                     `SUMMARY:Maintenance: ${vehicle.licensePlate}`,
