@@ -1,12 +1,12 @@
-```gitignore
+```
 # Dependencies
 node_modules/
 
-# Build outputs
+# Build artifacts
 dist/
 build/
 *.js.map
-*.tsbuildinfo
+*.ts.map
 
 # Environment variables
 .env
@@ -16,13 +16,9 @@ build/
 # Editors
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# Logs and temporary files
+# Logs
 *.log
-*.tmp
-*.temp
 
 # Python (if applicable)
 __pycache__/
@@ -30,26 +26,44 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
-venv/
-.venv/
-.env
-.env.local
+*.so
+
+# Temporary files
+*.tmp
+*.temp
+*~
+.DS_Store
+Thumbs.db
 
 # Coverage reports
 coverage/
 htmlcov/
 .coverage
 
-# OS generated files
-.DS_Store
-Thumbs.db
+# Test and cache directories
+.mypy_cache/
+.pytest_cache/
+.nyc_output/
+coverage/
 
-# Compiled/Binary files
-*.exe
-*.dll
-*.so
-*.a
-*.o
-*.obj
-*.out
+# Compiled JavaScript/TypeScript
+lib/
+out/
+.nuxt/
+.next/
+.vercel/
+
+# Distribution / packaging
+*.tar.gz
+*.whl
+*.egg
+*.egg-info/
+
+# System files
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Icon?
 ```

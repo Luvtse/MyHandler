@@ -35,6 +35,10 @@ import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import DashboardLayout from "@/dashboard/DashboardLayout";
 import DashboardHome from "@/dashboard/DashboardHome";
 import ShipmentsManagement from "@/pages/ShipmentsManagement";
+import CreateShipmentPage from "@/pages/CreateShipmentPage";
+import ViewShipment from "@/pages/ViewShipment";
+import EditShipment from "@/pages/EditShipment";
+import ResumeDraft from "@/pages/ResumeDraft";
 import ReportsPage from "@/dashboard/report/ReportsPage";
 import { AuthProvider } from "@/features/auth/hooks";
 import ProtectedRoute from "@/features/components/ProtectedRoute";
@@ -87,7 +91,7 @@ const App = () => (
             {/* Public routes */}
             <Route path="/" element={<Index />} />
             <Route path="/tracking" element={<Tracking />} />
-            <Route path="/create-shipment" element={<CreateShipment />} />
+            <Route path="/create-shipment" element={<CreateShipmentPage />} />
             <Route path="/schedule-pickup" element={<SchedulePickup />} />
             <Route path="/locations" element={<Locations />} />
             <Route path="/support" element={<Support />} />
@@ -329,6 +333,30 @@ const App = () => (
               <Route path="shipments" element={
                 <ProtectedRoute requiredPermission="shipment:read">
                   <ShipmentsManagement />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="shipments/create" element={
+                <ProtectedRoute requiredPermission="shipment:create">
+                  <CreateShipmentPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="shipments/:awb" element={
+                <ProtectedRoute requiredPermission="shipment:read">
+                  <ViewShipment />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="shipments/:awb/edit" element={
+                <ProtectedRoute requiredPermission="shipment:update">
+                  <EditShipment />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="shipments/resume-draft" element={
+                <ProtectedRoute requiredPermission="shipment:create">
+                  <ResumeDraft />
                 </ProtectedRoute>
               } />
 

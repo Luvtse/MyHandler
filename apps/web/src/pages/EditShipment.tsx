@@ -1,0 +1,45 @@
+import React from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { ShipmentForm } from '@/components/shipments/ShipmentForm';
+import { Button } from '@/shared/ui/Button';
+
+const EditShipment: React.FC = () => {
+  const { awb } = useParams<{ awb: string }>();
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    navigate('/dashboard/shipments');
+  };
+
+  const handleSuccess = () => {
+    navigate(`/dashboard/shipments/${awb}`);
+  };
+
+  if (!awb) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
+        <p>AWB number not provided</p>
+        <button 
+          onClick={handleBack}
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="mb-6 flex items-center gap-4">
+        <Button variant="outline" onClick={handleBack}>
+          Cancel
+        </Button>
+      </div>
+      <ShipmentForm mode="edit" awb={awb} onSuccess={handleSuccess} onCancel={handleBack} />
+    </div>
+  );
+};
+
+export default EditShipment;
