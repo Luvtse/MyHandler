@@ -1,11 +1,11 @@
-# Lwebapp
+# WORIYA EXPRESS
 
 A full-stack web application monorepo featuring a React frontend and Express.js API backend.
 
 ## Project Structure
 
 ```
-lwebapp/
+woriya-express/
 ├── apps/
 │   ├── api/              # Express.js backend with Prisma ORM
 │   └── web/              # React frontend with Vite
@@ -75,7 +75,7 @@ Create `.env` files in the respective app directories:
 
 #### `apps/api/.env`
 ```env
-DATABASE_URL="postgresql://user:password@localhost:5432/lwebapp"
+DATABASE_URL="postgresql://user:password@localhost:5432/woriya_express"
 JWT_SECRET="your-jwt-secret"
 GOOGLE_CLIENT_ID="your-google-client-id"
 GOOGLE_CLIENT_SECRET="your-google-client-secret"

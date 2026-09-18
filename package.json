@@ -1,5 +1,5 @@
 {
-  "name": "lwebapp",
+  "name": "woriya-express",
   "private": true,
   "version": "0.0.0",
   "workspaces": [
@@ -7,10 +7,10 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:web": "npm -w @lwebapp/web run dev",
-    "dev:api": "npm -w @lwebapp/api run dev",
-    "build": "npm -w @lwebapp/api run build && npm -w @lwebapp/web run build",
-    "lint": "npm -w @lwebapp/web run lint"
+    "dev:web": "npm -w @woriya-express/web run dev",
+    "dev:api": "npm -w @woriya-express/api run dev",
+    "build": "npm -w @woriya-express/api run build && npm -w @woriya-express/web run build",
+    "lint": "npm -w @woriya-express/web run lint"
   },
   "dependencies": {
     "fast-xml-parser": "5.10.1"

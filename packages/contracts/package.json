@@ -1,5 +1,5 @@
 {
-  "name": "@lwebapp/contracts",
+  "name": "@woriya-express/contracts",
   "version": "0.0.0",
   "main": "index.ts",
   "types": "index.ts"
