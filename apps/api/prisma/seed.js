@@ -168,7 +168,7 @@ async function seedRegionalHub() {
 }
 
 async function seedAdminUser() {
-  const email = 'admin@lwebapp.local';
+  const email = 'admin@woriya-express.local';
   const hashed = bcrypt.hashSync('Admin@12345', 10);
   await prisma.user.upsert({
     where: { email },

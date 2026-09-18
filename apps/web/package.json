@@ -1,5 +1,5 @@
 {
-  "name": "@lwebapp/web",
+  "name": "@woriya-express/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,8 +11,8 @@
     "@fullcalendar/react": "^6.1.20",
     "@fullcalendar/timegrid": "^6.1.20",
     "@hookform/resolvers": "^3.9.1",
-    "@lwebapp/api-client": "file:../../packages/api-client",
-    "@lwebapp/contracts": "file:../../packages/contracts",
+    "@woriya-express/api-client": "file:../../packages/api-client",
+    "@woriya-express/contracts": "file:../../packages/contracts",
     "@mui/icons-material": "^7.3.6",
     "@mui/material": "^7.3.6",
     "@radix-ui/react-accordion": "^1.2.12",
