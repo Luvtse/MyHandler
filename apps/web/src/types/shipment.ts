@@ -45,8 +45,8 @@ export interface ChargesInformation {
 export type PaymentType = 'prepaid' | 'collect' | 'account';
 export type PackageType = 'envelope' | 'box' | 'carton' | 'tube' | 'pallet';
 export type ServiceType = 'express-domestic' | 'express-worldwide' | 'priority' | 'standard' | 'economy';
-
 export type ShipmentStatus = string;
+export type ShipmentLifecycleStatus = 'draft' | 'active' | 'cancelled';
 
 export interface Shipment {
   id: string;
@@ -66,4 +66,12 @@ export interface Shipment {
   totalWeight: number;
   totalValue: number;
   totalCurrency: Currency;
+  status?: ShipmentStatus;
+  lifecycleStatus?: ShipmentLifecycleStatus;
+}
+
+export interface DraftShipment extends Omit<Shipment, 'id' | 'awbNumber' | 'createdAt'> {
+  id: string;
+  createdAt: string;
+  lifecycleStatus: 'draft';
 }

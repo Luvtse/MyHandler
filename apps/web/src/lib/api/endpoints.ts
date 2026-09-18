@@ -31,6 +31,14 @@ interface ShipmentEndpoints {
   etaAvailability: string;
   airports: string;
   flightSchedules: string;
+  // Draft endpoints
+  drafts: {
+    list: string;
+    get: (id: string) => string;
+    create: string;
+    update: (id: string) => string;
+    finalize: (id: string) => string;
+  };
 }
 
 interface UserEndpoints {
@@ -171,6 +179,14 @@ export const API_ENDPOINTS: ApiEndpoints = {
     etaAvailability: '/shipments/eta/availability',
     airports: '/shipments/airports',
     flightSchedules: '/shipments/flight-schedules',
+    // Draft endpoints - Backend contract assumption: drafts use /shipments/drafts/*
+    drafts: {
+      list: '/shipments/drafts',
+      get: (id: string) => `/shipments/drafts/${id}`,
+      create: '/shipments/drafts',
+      update: (id: string) => `/shipments/drafts/${id}`,
+      finalize: (id: string) => `/shipments/drafts/${id}/finalize`,
+    },
   },
   users: {
     profile: '/users/profile',
