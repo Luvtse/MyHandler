@@ -16,14 +16,14 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "GoodsHandler API"
+args = "WORIYA EXPRESS API"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "GoodsHandler Web"
+args = "WORIYA EXPRESS Web"
 
 [[workflows.workflow]]
-name = "GoodsHandler API"
+name = "WORIYA EXPRESS API"
 author = "agent"
 
 [[workflows.workflow.tasks]]
@@ -31,7 +31,7 @@ task = "shell.exec"
 args = "cd apps/api && npm run dev"
 
 [[workflows.workflow]]
-name = "GoodsHandler Web"
+name = "WORIYA EXPRESS Web"
 author = "agent"
 
 [[workflows.workflow.tasks]]

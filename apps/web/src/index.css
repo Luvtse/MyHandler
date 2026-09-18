@@ -1,5 +1,5 @@
 /* ──────────────────────────────────────────────────────────────
-   GoodsHandler Brand Typography
+   WORIYA EXPRESS Brand Typography
    Primary:   Inter (headings + body — modern, legible, trustworthy)
    Mono:      JetBrains Mono (tracking numbers, codes)
    Note: @import must precede all other rules (CSS spec).
@@ -12,7 +12,7 @@
 
 @layer base {
   :root {
-    /* ── GoodsHandler Brand Palette ──────────────────────────
+    /* ── WORIYA EXPRESS Brand Palette ──────────────────────────
        Bold Blue   #1A3C8F  (primary — trust, authority, depth)
        Mid Blue    #2756C5  (interactive states, hover)
        Light Blue  #E8EFFE  (backgrounds, chips, tints)
