@@ -307,7 +307,7 @@ fleetRouter.post(
         notes: notes ?? null,
         vendor: vendor ?? null,
         cost: estimatedCost != null ? Number(estimatedCost) : null,
-        createdBy: (req as any).user?.id ?? vehicleId,
+        createdBy: (req as any).user?.sub ?? vehicleId,
         status: 'scheduled' as any,
       },
     });

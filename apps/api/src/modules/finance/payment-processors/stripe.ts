@@ -5,7 +5,7 @@ export class StripeProcessor implements PaymentProcessor {
   private apiKey: string;
   
   constructor() {
-    this.apiKey = config.stripe.secretKey || 'sk_test_placeholder';
+    this.apiKey = config.stripe.secretKey;
   }
   
   async processPayment(paymentData: PaymentData): Promise<PaymentResult> {

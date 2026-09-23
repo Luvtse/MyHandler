@@ -7,8 +7,8 @@ export class PayPalProcessor implements PaymentProcessor {
   private isSandbox: boolean;
   
   constructor() {
-    this.clientId = config.paypal?.clientId || 'test_client_id';
-    this.clientSecret = config.paypal?.clientSecret || 'test_client_secret';
+    this.clientId = config.paypal?.clientId;
+    this.clientSecret = config.paypal?.clientSecret;
     this.isSandbox = config.paypal?.sandbox !== false;
   }
   

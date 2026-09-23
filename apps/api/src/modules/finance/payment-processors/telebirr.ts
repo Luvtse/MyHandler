@@ -8,9 +8,9 @@ export class TelebirrProcessor implements PaymentProcessor {
   private baseUrl: string;
   
   constructor() {
-    this.appId = config.telebirr?.appId || 'test_app_id';
-    this.appKey = config.telebirr?.appKey || 'test_app_key';
-    this.publicKey = config.telebirr?.publicKey || 'test_public_key';
+    this.appId = config.telebirr?.appId;
+    this.appKey = config.telebirr?.appKey;
+    this.publicKey = config.telebirr?.publicKey;
     this.baseUrl = 'https://api.telebirr.com/api/checkout/';
   }
   

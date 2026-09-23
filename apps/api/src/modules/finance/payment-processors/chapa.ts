@@ -6,7 +6,7 @@ export class ChapaPay implements PaymentProcessor {
   private baseUrl: string;
   
   constructor() {
-    this.apiKey = config.chapa?.secretKey || 'CHAPASECRET_TEST_KEY';
+    this.apiKey = config.chapa?.secretKey;
     this.baseUrl = 'https://api.chapa.co/v1';
   }
   

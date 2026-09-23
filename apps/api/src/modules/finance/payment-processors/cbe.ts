@@ -6,8 +6,8 @@ export class CBEProcessor implements PaymentProcessor {
   private apiKey: string;
   
   constructor() {
-    this.merchantId = config.cbe?.merchantId || 'test_merchant_id';
-    this.apiKey = config.cbe?.apiKey || 'test_api_key';
+    this.merchantId = config.cbe?.merchantId;
+    this.apiKey = config.cbe?.apiKey;
   }
   
   async processPayment(paymentData: PaymentData): Promise<PaymentResult> {
