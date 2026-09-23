@@ -1,9 +1,22 @@
 import { Router } from 'express';
-import { requireAuth } from '../../services/authService';
+import { requireAuth, requireRole } from '../../services/authService';
+import { catchAsync } from '../../middlewares/catchAsync';
+import { getRegionalData } from './regional.service';
 
 export const analyticsRouter = Router();
 
 analyticsRouter.use(requireAuth);
+
+// GET /api/analytics/regional/:region — regional metrics for the Regional Manager dashboard.
+// Role-gated: only admins and regional managers may read regional performance data.
+analyticsRouter.get(
+  '/regional/:region',
+  requireRole(['admin', 'regional_manager']),
+  catchAsync(async (req, res) => {
+    const data = await getRegionalData(req.params.region);
+    res.json({ success: true, data });
+  }),
+);
 
 analyticsRouter.get('/kpis', async (_req, res) => {
   // Placeholder KPIs
