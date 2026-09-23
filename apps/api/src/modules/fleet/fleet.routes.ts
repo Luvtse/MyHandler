@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import prisma from '../../utils/prisma';
-import { requireAuth } from '../../services/authService';
+import { requireAuth, requireRole } from '../../services/authService';
 import { catchAsync } from '../../middlewares/catchAsync';
 import { AppError } from '../../middlewares/AppError';
 
 export const fleetRouter = Router();
 fleetRouter.use(requireAuth);
+// Role gating: fleet data (vehicles, metrics, maintenance) is restricted to
+// admins and fleet managers — mirrors the executive routes' requireRole pattern.
+fleetRouter.use(requireRole(['admin', 'fleet_manager']));
 
 // ─── Route Optimization (Haversine + 2-opt) ──────────────────────────────────
 

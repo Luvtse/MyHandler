@@ -1,5 +1,5 @@
-// @/dashboard/executive/regional/RegionalDashboard.tsx
-import React, { useState, useEffect } from 'react';
+// @/dashboard/regional-manager/RegionalDashboard.tsx
+import React from 'react';
 import {
   MapPin,
   Package,
@@ -10,89 +10,35 @@ import {
   TrendingUp,
   Bot,
   RefreshCw,
-  Zap,
 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/features/auth/hooks';
-import { toast } from 'sonner';
 import RegionSelector from '@/dashboard/regional-manager/RegionSelector';
-
-// Types
-interface RegionalMetrics {
-  region: string;
-  shipments: number;
-  revenue: number; // ETB
-  activeClients: number;
-  fleetUtilization: number; // %
-  onTimeDelivery: number; // %
-  avgFulfillmentTime: number; // hours
-  costPerShipment: number; // ETB
-  clientRetention: number; // %
-}
-
-interface RegionalInsight {
-  id: string;
-  title: string;
-  message: string;
-  confidence: number;
-  severity: 'low' | 'medium' | 'high';
-  recommendation: string;
-}
-
-// Mock data generator
-const getMockData = (region: string) => {
-  const baseData: Record<string, RegionalMetrics> = {
-    'addis_ababa': {
-      region: 'Addis Ababa',
-      shipments: 820,
-      revenue: 4200000,
-      activeClients: 14,
-      fleetUtilization: 92.4,
-      onTimeDelivery: 89.7,
-      avgFulfillmentTime: 7.2,
-      costPerShipment: 285.5,
-      clientRetention: 86.3,
-    },
-    'dire_dawa': {
-      region: 'Dire Dawa',
-      shipments: 340,
-      revenue: 1850000,
-      activeClients: 6,
-      fleetUtilization: 78.2,
-      onTimeDelivery: 94.1,
-      avgFulfillmentTime: 9.8,
-      costPerShipment: 310.2,
-      clientRetention: 91.5,
-    },
-    'hawassa': {
-      region: 'Hawassa',
-      shipments: 260,
-      revenue: 1400000,
-      activeClients: 4,
-      fleetUtilization: 65.8,
-      onTimeDelivery: 87.3,
-      avgFulfillmentTime: 11.2,
-      costPerShipment: 345.7,
-      clientRetention: 82.0,
-    },
-  };
-
-  return baseData[region] || baseData['addis_ababa'];
-};
+import { getRegionalData } from '@/services/regional';
+import type { RegionalMetrics, RegionalInsight } from '@/services/regional';
 
 const RegionalDashboard = () => {
   const { region: regionParam } = useParams<{ region: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [metrics, setMetrics] = useState<RegionalMetrics | null>(null);
-  const [insights, setInsights] = useState<RegionalInsight[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const qc = useQueryClient();
 
   // Use URL param as source of truth for the selected region
   const currentRegion = regionParam || 'addis_ababa';
+
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
+    queryKey: ['regional-dashboard', currentRegion],
+    queryFn: () => getRegionalData(currentRegion),
+    staleTime: 2 * 60_000, // 2 min
+    retry: 1,
+    refetchInterval: 5 * 60_000, // auto-refresh every 5 mins
+  });
+
+  const metrics: RegionalMetrics | undefined = data?.metrics;
+  const insights: RegionalInsight[] = data?.insights ?? [];
+  const benchmarks = data?.benchmarks;
 
   // Handle region change from selector — keep URL in sync
   const handleRegionChange = (newRegion: string) => {
@@ -100,46 +46,8 @@ const RegionalDashboard = () => {
   };
 
   const refreshData = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      // NOTE: No backend endpoint exists yet for regional metrics.
-      // TODO: Replace with GET /api/regional/:region/metrics when available.
-      const data = getMockData(currentRegion);
-      setMetrics(data);
-      
-      // Mock insights based on region
-      const newInsights: RegionalInsight[] = [];
-      if (data.fleetUtilization > 90) {
-        newInsights.push({
-          id: 'ins-01',
-          title: 'Fleet Overutilization Alert',
-          message: `Fleet utilization in ${data.region} is at ${data.fleetUtilization}%. Risk of vehicle breakdowns.`,
-          confidence: 0.89,
-          severity: 'medium',
-          recommendation: 'Request additional vehicles from central pool or rebalance routes.',
-        });
-      }
-      if (data.onTimeDelivery < 90) {
-        newInsights.push({
-          id: 'ins-02',
-          title: 'On-Time Delivery at Risk',
-          message: `On-time delivery in ${data.region} is ${data.onTimeDelivery}% (below 90% target).`,
-          confidence: 0.92,
-          severity: 'medium',
-          recommendation: 'Review route planning and driver assignments.',
-        });
-      }
-      setInsights(newInsights);
-      setIsRefreshing(false);
-      toast.success('Regional data refreshed');
-    }, 600);
+    qc.invalidateQueries({ queryKey: ['regional-dashboard', currentRegion] });
   };
-
-  useEffect(() => {
-    refreshData();
-    const interval = setInterval(refreshData, 300_000); // 5 mins
-    return () => clearInterval(interval);
-  }, [currentRegion]);
 
   const getSeverityColor = (severity: RegionalInsight['severity']) => {
     switch (severity) {
@@ -149,7 +57,7 @@ const RegionalDashboard = () => {
     }
   };
 
-  if (!metrics) {
+  if (isLoading && !metrics) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -160,12 +68,33 @@ const RegionalDashboard = () => {
     );
   }
 
+  if (isError && !metrics) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-red-700 text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          Failed to load regional data.
+          <button className="underline ml-1" onClick={() => refetch()}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!metrics) return null;
+
   return (
     <div className="space-y-6">
+      {isError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-red-700 text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          Failed to refresh regional data. <button className="underline ml-1" onClick={() => refetch()}>Retry</button>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Regional Dashboard: {metrics.region}
+            Regional Dashboard: {metrics?.region ?? currentRegion}
           </h1>
           <p className="text-muted-foreground">
             Localized performance and operational health
@@ -181,10 +110,10 @@ const RegionalDashboard = () => {
             variant="outline"
             size="sm"
             onClick={refreshData}
-            disabled={isRefreshing}
+            disabled={isFetching}
             className="flex items-center gap-2"
           >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
@@ -287,7 +216,7 @@ const RegionalDashboard = () => {
                 style={{ width: `${metrics.onTimeDelivery}%` }}
               />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">National avg: 92.4%</p>
+            <p className="text-xs text-muted-foreground mt-1">National avg: {benchmarks?.nationalOnTimeDelivery ?? 0}%</p>
           </CardContent>
         </Card>
 
@@ -311,7 +240,7 @@ const RegionalDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">ETB {metrics.costPerShipment}</div>
-            <p className="text-xs text-muted-foreground mt-1">National avg: ETB 295.5</p>
+            <p className="text-xs text-muted-foreground mt-1">National avg: ETB {(benchmarks?.nationalCostPerShipment ?? 0).toLocaleString()}</p>
           </CardContent>
         </Card>
       </div>
@@ -351,7 +280,7 @@ const RegionalDashboard = () => {
               <p className="text-sm text-muted-foreground">On-Time Delivery</p>
               <p className="text-lg font-bold">{metrics.onTimeDelivery}%</p>
               <p className="text-xs">
-                {metrics.onTimeDelivery > 92.4 ? (
+                {metrics.onTimeDelivery > (benchmarks?.nationalOnTimeDelivery ?? 0) ? (
                   <span className="text-green-500">↑ Above national avg</span>
                 ) : (
                   <span className="text-destructive">↓ Below national avg</span>
@@ -362,7 +291,7 @@ const RegionalDashboard = () => {
               <p className="text-sm text-muted-foreground">Cost per Shipment</p>
               <p className="text-lg font-bold">ETB {metrics.costPerShipment}</p>
               <p className="text-xs">
-                {metrics.costPerShipment < 295.5 ? (
+                {metrics.costPerShipment < (benchmarks?.nationalCostPerShipment ?? Infinity) ? (
                   <span className="text-green-500">↓ Better than avg</span>
                 ) : (
                   <span className="text-destructive">↑ Higher than avg</span>
