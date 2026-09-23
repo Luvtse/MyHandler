@@ -1,5 +1,6 @@
 // src/pages/dashboard/ShipmentsManagement.tsx
 import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -27,7 +28,8 @@ import {
   Package, 
   EyeIcon,
   FileEdit,
-  Trash2
+  Trash2,
+  Plus
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -96,6 +98,7 @@ const renderStatusBadge = (canonicalStatus?: string) => {
 };
 
 const ShipmentsManagement: React.FC = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   type CanonicalStatusId = typeof SHIPMENT_STATUSES[number]['id'];
   const [statusFilter, setStatusFilter] = useState<'all' | CanonicalStatusId>('all');
@@ -105,6 +108,7 @@ const ShipmentsManagement: React.FC = () => {
   const [updateLocation, setUpdateLocation] = useState('');
   const [updateNotes, setUpdateNotes] = useState('');
   const [shipments, setShipments] = useState<UIShipment[]>([]);
+  const [drafts, setDrafts] = useState<UIShipment[]>([]);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [total, setTotal] = useState(0);
@@ -134,6 +138,18 @@ const ShipmentsManagement: React.FC = () => {
         const pagination = Array.isArray(resp) ? { total: list.length, page, limit } : (resp?.pagination || resp);
         setTotal(pagination.total || list.length);
         setPages(Math.max(1, Math.ceil((pagination.total || list.length) / (pagination.limit || limit))));
+        
+        // Fetch drafts
+        try {
+          const draftsResp: any = await apiClient.request({
+            method: 'GET',
+            url: API_ENDPOINTS.shipments.drafts.list,
+          });
+          const draftsList = Array.isArray(draftsResp.data) ? draftsResp.data : [];
+          setDrafts(draftsList.map(toPartialShipment));
+        } catch (e) {
+          console.error('Failed to load drafts:', e);
+        }
       } catch (e: any) {
         setError(typeof e?.message === 'string' ? e.message : 'Failed to load shipments');
       } finally {
@@ -285,8 +301,11 @@ const ShipmentsManagement: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold tracking-tight">Shipment Management</h1>
         <div>
-          <Button className="flex items-center gap-2">
-            <Package size={16} />
+          <Button 
+            className="flex items-center gap-2"
+            onClick={() => navigate('/dashboard/shipments/create')}
+          >
+            <Plus size={16} />
             New Shipment
           </Button>
         </div>
@@ -424,10 +443,20 @@ const ShipmentsManagement: React.FC = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end space-x-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedShipment(shipment); setDetailsOpen(true); }}>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8" 
+                              onClick={() => navigate(`/dashboard/shipments/${shipment.awbNumber}`)}
+                            >
                               <EyeIcon className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setSelectedShipment(shipment); setEditOpen(true); }}>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8" 
+                              onClick={() => navigate(`/dashboard/shipments/${shipment.awbNumber}/edit`)}
+                            >
                               <FileEdit className="h-4 w-4" />
                             </Button>
                             <Button

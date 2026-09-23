@@ -199,6 +199,14 @@ export interface ShipmentFormProps {
   mode: ShipmentFormMode;
   draftId?: string;
   shipmentId?: string;
+  /**
+   * Optional identifier (shipment id / AWB) resolved by the parent page from
+   * route params. When provided in view/edit mode it takes precedence over
+   * `shipmentId`.
+   */
+  awb?: string;
+  /** Called after a successful create/finalize/update. Receives the created AWB if known. */
+  onSuccess?: (awb?: string) => void;
   onSubmitSuccess?: (shipment: Shipment) => void;
   onCancel?: () => void;
 }
@@ -207,6 +215,8 @@ export const ShipmentForm: React.FC<ShipmentFormProps> = ({
   mode,
   draftId,
   shipmentId,
+  awb,
+  onSuccess,
   onSubmitSuccess,
   onCancel,
 }) => {
@@ -214,6 +224,13 @@ export const ShipmentForm: React.FC<ShipmentFormProps> = ({
   const isEditMode = mode === 'edit';
   const isCreateMode = mode === 'create';
   const isResumeDraftMode = mode === 'resume-draft';
+
+  // Route pages may pass the draft reference via `awb` prop instead of `draftId`
+  const resolvedDraftId = draftId || (mode === 'resume-draft' ? awb : undefined);
+
+  // In view/edit modes the parent page may pass the identifier via `awb`
+  // (from route params). Normalize to a single target id.
+  const targetShipmentId = shipmentId || (isReadOnly || isEditMode ? awb : undefined);
 
   const { toast } = useToast();
   const [paymentType, setPaymentType] = useState<'prepaid' | 'collect' | 'account'>('prepaid');
@@ -265,11 +282,11 @@ export const ShipmentForm: React.FC<ShipmentFormProps> = ({
       setLoading(true);
       try {
         let data: any;
-        if (isResumeDraftMode && draftId) {
-          const resp = await apiRequestData({ method: 'GET', url: API_ENDPOINTS.shipments.drafts.get(draftId) });
+        if (isResumeDraftMode && resolvedDraftId) {
+          const resp = await apiRequestData<any>({ method: 'GET', url: API_ENDPOINTS.shipments.drafts.get(resolvedDraftId!) });
           data = resp.data || resp;
-        } else if (shipmentId) {
-          const resp = await apiRequestData({ method: 'GET', url: API_ENDPOINTS.shipments.details(shipmentId) });
+        } else if (targetShipmentId) {
+          const resp = await apiRequestData<any>({ method: 'GET', url: API_ENDPOINTS.shipments.details(targetShipmentId) });
           data = resp.data || resp;
         }
 
@@ -324,7 +341,7 @@ export const ShipmentForm: React.FC<ShipmentFormProps> = ({
     };
 
     loadExistingData();
-  }, [mode, draftId, shipmentId, isCreateMode]);
+  }, [mode, draftId, targetShipmentId, isCreateMode]);
 
   const {
     register,
@@ -438,17 +455,17 @@ export const ShipmentForm: React.FC<ShipmentFormProps> = ({
       };
 
       let result: any;
-      if (isResumeDraftMode && draftId) {
+      if (isResumeDraftMode && resolvedDraftId) {
         // Update existing draft
-        const resp = await apiRequestData({
+        const resp = await apiRequestData<any>({
           method: 'PUT',
-          url: API_ENDPOINTS.shipments.drafts.update(draftId),
+          url: API_ENDPOINTS.shipments.drafts.update(resolvedDraftId!),
           data: payload,
         });
         result = resp.data || resp;
       } else {
         // Create new draft
-        const resp = await apiRequestData({
+        const resp = await apiRequestData<any>({
           method: 'POST',
           url: API_ENDPOINTS.shipments.drafts.create,
           data: payload,
@@ -499,11 +516,11 @@ export const ShipmentForm: React.FC<ShipmentFormProps> = ({
     try {
       let result: any;
 
-      if (isResumeDraftMode && draftId) {
+      if (isResumeDraftMode && resolvedDraftId) {
         // Finalize the draft - this generates AWB
-        const resp = await apiRequestData({
+        const resp = await apiRequestData<any>({
           method: 'POST',
-          url: API_ENDPOINTS.shipments.drafts.finalize(draftId),
+          url: API_ENDPOINTS.shipments.drafts.finalize(resolvedDraftId!),
           data: {
             ...data,
             paymentType,
@@ -542,7 +559,7 @@ export const ShipmentForm: React.FC<ShipmentFormProps> = ({
           status: 'order_received',
         };
 
-        const resp = await apiRequestData({
+        const resp = await apiRequestData<any>({
           method: 'POST',
           url: API_ENDPOINTS.shipments.create,
           data: backendShipmentData,
@@ -688,6 +705,9 @@ export const ShipmentForm: React.FC<ShipmentFormProps> = ({
           URL.revokeObjectURL(invoicePdfUrl);
           if (onSubmitSuccess) {
             onSubmitSuccess(result);
+          }
+          if (onSuccess) {
+            onSuccess(result.reference || result.awbNumber);
           }
         }, 1000);
       }
