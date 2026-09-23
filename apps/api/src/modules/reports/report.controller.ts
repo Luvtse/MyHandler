@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { hasAnyRole } from '../../services/authService';
 import { z } from 'zod';
 import { reportService, ReportFilters } from '../../services/reportService';
 
@@ -38,9 +39,9 @@ export const reportController = {
       const validatedData = generateReportSchema.parse(req.body);
       const filters: ReportFilters = {
         ...validatedData,
-        userId: req.user.role === 'admin' || req.user.secondaryRoles?.some((r: { role: string }) => r.role === 'finance') 
-          ? validatedData.userId 
-          : String(req.user.id),
+        userId: await hasAnyRole(req, ['admin', 'finance'])
+          ? validatedData.userId
+          : String(req.user.sub),
       };
 
       let buffer: Buffer;
@@ -120,9 +121,9 @@ export const reportController = {
       const metadata = await reportService.getReportMetadata(reportType, {
         ...filters,
         format: 'excel', // Format doesn't matter for metadata
-        userId: req.user.role === 'admin' || req.user.secondaryRoles?.some((r: { role: string }) => r.role === 'finance') 
-          ? filters.userId 
-          : String(req.user.id),
+        userId: await hasAnyRole(req, ['admin', 'finance'])
+          ? filters.userId
+          : String(req.user.sub),
       });
 
       return res.json({
@@ -192,10 +193,10 @@ export const reportController = {
       const userRole = user.role;
       const availableReports = reports.filter(report => {
         if (report.id === 'leaves') {
-          return userRole === 'admin' || userRole === 'hr' || userRole === 'hr_manager' || userRole === 'hr_staff' || user.secondaryRoles?.some((r: { role: string }) => r.role === 'hr' || r.role === 'hr_manager' || r.role === 'hr_staff');
+          return await hasAnyRole(req, ['admin', 'hr', 'hr_manager', 'hr_staff']);
         }
         if (report.id === 'financial') {
-          return userRole === 'admin' || userRole === 'finance' || user.secondaryRoles?.some((r: { role: string }) => r.role === 'finance');
+          return await hasAnyRole(req, ['admin', 'finance']);
         }
         return true;
       });

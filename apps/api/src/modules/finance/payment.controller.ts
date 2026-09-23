@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { hasAnyRole } from '../../services/authService';
 import prisma from '../../utils/prisma';
 
 import { z } from 'zod';
@@ -24,7 +25,7 @@ export const paymentController = {
       if (!req.user) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
-      const userId = String(req.user.id);
+      const userId = String(req.user.sub);
       const validatedData = createPaymentSchema.parse(req.body);
       
       // Check if invoice exists
@@ -121,7 +122,7 @@ export const paymentController = {
       if (!req.user) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
-      const userId = String(req.user.id);
+      const userId = String(req.user.sub);
       const validatedData = createPaymentSchema.parse(req.body);
       
       // Check if invoice exists
@@ -179,7 +180,7 @@ export const paymentController = {
       }
       const { id } = req.params;
       const { status } = req.body;
-      const isAdmin = req.user.role === 'admin' || req.user.secondaryRoles?.some((r: { role: string }) => r.role === 'finance');
+      const isAdmin = await hasAnyRole(req, ['admin', 'finance']);
       
       // Only admins and finance users can update payment status
       if (!isAdmin) {
@@ -247,8 +248,8 @@ export const paymentController = {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
       const { invoiceId } = req.params;
-      const userId = String(req.user.id);
-      const isAdmin = req.user.role === 'admin' || req.user.secondaryRoles?.some((r: { role: string }) => r.role === 'finance');
+      const userId = String(req.user.sub);
+      const isAdmin = await hasAnyRole(req, ['admin', 'finance']);
       
       // Check if invoice exists and user has access
       const invoice = await prisma.invoice.findUnique({

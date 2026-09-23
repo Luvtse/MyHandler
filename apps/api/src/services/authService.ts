@@ -161,6 +161,33 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 }
 
+/**
+ * Load a user's secondary roles from the database.
+ * NOTE: `req.user` is only the JWT payload ({ sub, email, role }) and never
+ * contains `secondaryRoles`. Role checks that must consider secondary roles
+ * (e.g. finance staff holding a secondary role) MUST use this helper instead
+ * of reading a token claim — tokens are client-held and must not be trusted
+ * for data that can change server-side.
+ */
+export async function getSecondaryRoles(userId: string): Promise<string[]> {
+  const rows = await prisma.userSecondaryRole.findMany({ where: { userId } });
+  return rows.map((r) => String(r.role));
+}
+
+/**
+ * True if the authenticated primary role or any DB-stored secondary role
+ * matches one of `roles`. Falls back to the JWT primary role when no userId
+ * is provided (secondary roles are then simply unavailable).
+ */
+export async function hasAnyRole(req: Request, roles: string[]): Promise<boolean> {
+  const user = (req as any).user as { sub?: string; role?: string } | undefined;
+  if (!user) return false;
+  if (user.role && roles.includes(user.role)) return true;
+  if (!user.sub) return false;
+  const secondary = await getSecondaryRoles(user.sub);
+  return secondary.some((r) => roles.includes(r));
+}
+
 export function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
@@ -170,21 +197,55 @@ export function requireRole(roles: string[]) {
   };
 }
 
+/**
+ * Async role gate: allows the request when the JWT primary role OR any
+ * DB-stored secondary role matches `roles`. Use this instead of inline
+ * `req.user?.role !== 'admin'` checks so warehouse/admin access granted via
+ * secondary roles is honored consistently.
+ */
+export function requireAnyRole(roles: string[]) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const allowed = await hasAnyRole(req, roles);
+      if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+      next();
+    } catch (e) {
+      next(e);
+    }
+  };
+}
+
 export function requirePermission(permission: Permission) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const user = (req as any).user;
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-    if (!hasPermission(user, permission)) return res.status(403).json({ error: 'Forbidden' });
-    next();
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      // Secondary roles live in the DB only — never trust a token claim for them.
+      const secondaryRoles = user.sub ? await getSecondaryRoles(user.sub) : [];
+      if (!hasPermission({ ...user, secondaryRoles }, permission)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      next();
+    } catch (e) {
+      next(e);
+    }
   };
 }
 
 export function requireAnyPermission(perms: Permission[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const user = (req as any).user;
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-    const allowed = perms.some((p) => hasPermission(user, p));
-    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
-    next();
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const secondaryRoles = user.sub ? await getSecondaryRoles(user.sub) : [];
+      const fullUser = { ...user, secondaryRoles };
+      const allowed = perms.some((p) => hasPermission(fullUser as any, p));
+      if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+      next();
+    } catch (e) {
+      next(e);
+    }
   };
 }

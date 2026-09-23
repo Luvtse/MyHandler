@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { shipmentsService } from './shipments.service';
 import { etaService } from './eta.service';
-import { requireAuth } from '../../services/authService';
+import { requireAuth, requireAnyRole } from '../../services/authService';
 import prisma from '../../utils/prisma';
 import { emailService } from '../../services/emailService';
 import { audit } from '../../middlewares/auditLog';
@@ -45,7 +45,7 @@ shipmentsRouter.get('/', requireAuth, async (req: any, res) => {
 
 // Airports and flight schedules management routes are defined below with full CRUD implementations.
 
-shipmentsRouter.get('/airports', requireAuth, async (req: any, res) => {
+shipmentsRouter.get('/airports', requireAuth, requireAnyRole(['admin', 'warehouse']), async (req: any, res) => {
   try {
     const rows = await prisma.airport.findMany({ orderBy: { city: 'asc' } });
     res.json({ success: true, data: rows });
@@ -54,11 +54,8 @@ shipmentsRouter.get('/airports', requireAuth, async (req: any, res) => {
   }
 });
 
-shipmentsRouter.get('/flight-schedules', requireAuth, async (req: any, res) => {
+shipmentsRouter.get('/flight-schedules', requireAuth, requireAnyRole(['admin', 'warehouse']), async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin' && req.user?.role !== 'warehouse') {
-      return res.status(403).json({ success: false, error: 'Forbidden' });
-    }
     const rows = await prisma.flightSchedule.findMany({ orderBy: [{ originCity: 'asc' }, { destinationCity: 'asc' }] });
     res.json({ success: true, data: rows });
   } catch {
@@ -322,17 +319,15 @@ shipmentsRouter.get('/eta/availability', async (req: any, res) => {
 });
 
 // Airports management (admin only)
-shipmentsRouter.get('/airports', requireAuth, async (req: any, res) => {
+shipmentsRouter.get('/airports', requireAuth, requireAnyRole(['admin', 'warehouse']), async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin' && req.user?.role !== 'warehouse') return res.status(403).json({ success: false, error: 'Forbidden' });
     const rows = await prisma.airport.findMany({ orderBy: { city: 'asc' } });
     res.json({ success: true, data: rows });
   } catch (e) { res.status(500).json({ success: false, error: 'Failed to load airports' }); }
 });
 
-shipmentsRouter.post('/airports', requireAuth, async (req: any, res) => {
+shipmentsRouter.post('/airports', requireAuth, requireAnyRole(['admin', 'warehouse']), async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin' && req.user?.role !== 'warehouse') return res.status(403).json({ success: false, error: 'Forbidden' });
     const created = await prisma.airport.create({ data: req.body });
     res.status(201).json({ success: true, data: created });
   } catch (e) { res.status(500).json({ success: false, error: 'Failed to create airport' }); }
@@ -340,7 +335,6 @@ shipmentsRouter.post('/airports', requireAuth, async (req: any, res) => {
 
 shipmentsRouter.put('/airports/:code', requireAuth, async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin' && req.user?.role !== 'warehouse') return res.status(403).json({ success: false, error: 'Forbidden' });
     const updated = await prisma.airport.update({ where: { code: req.params.code }, data: req.body });
     res.json({ success: true, data: updated });
   } catch (e) { res.status(500).json({ success: false, error: 'Failed to update airport' }); }
@@ -348,33 +342,29 @@ shipmentsRouter.put('/airports/:code', requireAuth, async (req: any, res) => {
 
 shipmentsRouter.delete('/airports/:code', requireAuth, async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin' && req.user?.role !== 'warehouse') return res.status(403).json({ success: false, error: 'Forbidden' });
     await prisma.airport.delete({ where: { code: req.params.code } });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, error: 'Failed to delete airport' }); }
 });
 
 // Flight schedules management (admin only)
-shipmentsRouter.get('/flight-schedules', requireAuth, async (req: any, res) => {
+shipmentsRouter.get('/flight-schedules', requireAuth, requireAnyRole(['admin', 'warehouse']), async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin' && req.user?.role !== 'warehouse') return res.status(403).json({ success: false, error: 'Forbidden' });
     const rows = await prisma.flightSchedule.findMany({ orderBy: [{ originCity: 'asc' }, { destinationCity: 'asc' }] });
     res.json({ success: true, data: rows });
   } catch (e) { res.status(500).json({ success: false, error: 'Failed to load flight schedules' }); }
 });
 
 // Service Level Settings management (admin)
-shipmentsRouter.get('/service-level-settings', requireAuth, async (req: any, res) => {
+shipmentsRouter.get('/service-level-settings', requireAuth, requireAnyRole(['admin', 'warehouse']), async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin') return res.status(403).json({ success: false, error: 'Forbidden' });
     const rows = await prisma.serviceLevelSettings.findMany();
     res.json({ success: true, data: rows });
   } catch { res.status(500).json({ success: false, error: 'Failed to load settings' }); }
 });
 
-shipmentsRouter.post('/service-level-settings', requireAuth, async (req: any, res) => {
+shipmentsRouter.post('/service-level-settings', requireAuth, requireAnyRole(['admin', 'warehouse']), async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin') return res.status(403).json({ success: false, error: 'Forbidden' });
     const created = await prisma.serviceLevelSettings.create({ data: req.body });
     res.status(201).json({ success: true, data: created });
   } catch { res.status(500).json({ success: false, error: 'Failed to create setting' }); }
@@ -382,7 +372,6 @@ shipmentsRouter.post('/service-level-settings', requireAuth, async (req: any, re
 
 shipmentsRouter.put('/service-level-settings/:id', requireAuth, async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin') return res.status(403).json({ success: false, error: 'Forbidden' });
     const updated = await prisma.serviceLevelSettings.update({ where: { id: req.params.id }, data: req.body });
     res.json({ success: true, data: updated });
   } catch { res.status(500).json({ success: false, error: 'Failed to update setting' }); }
@@ -390,24 +379,21 @@ shipmentsRouter.put('/service-level-settings/:id', requireAuth, async (req: any,
 
 shipmentsRouter.delete('/service-level-settings/:id', requireAuth, async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin') return res.status(403).json({ success: false, error: 'Forbidden' });
     await prisma.serviceLevelSettings.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch { res.status(500).json({ success: false, error: 'Failed to delete setting' }); }
 });
 
 // Operating calendar management (admin)
-shipmentsRouter.get('/operating-calendar', requireAuth, async (req: any, res) => {
+shipmentsRouter.get('/operating-calendar', requireAuth, requireAnyRole(['admin', 'warehouse']), async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin') return res.status(403).json({ success: false, error: 'Forbidden' });
     const rows = await prisma.operatingCalendar.findMany({ orderBy: { date: 'asc' } });
     res.json({ success: true, data: rows });
   } catch { res.status(500).json({ success: false, error: 'Failed to load calendar' }); }
 });
 
-shipmentsRouter.post('/operating-calendar', requireAuth, async (req: any, res) => {
+shipmentsRouter.post('/operating-calendar', requireAuth, requireAnyRole(['admin', 'warehouse']), async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin') return res.status(403).json({ success: false, error: 'Forbidden' });
     const created = await prisma.operatingCalendar.create({ data: req.body });
     res.status(201).json({ success: true, data: created });
   } catch { res.status(500).json({ success: false, error: 'Failed to create calendar entry' }); }
@@ -415,16 +401,14 @@ shipmentsRouter.post('/operating-calendar', requireAuth, async (req: any, res) =
 
 shipmentsRouter.delete('/operating-calendar/:id', requireAuth, async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin') return res.status(403).json({ success: false, error: 'Forbidden' });
     await prisma.operatingCalendar.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch { res.status(500).json({ success: false, error: 'Failed to delete calendar entry' }); }
 });
 
 // Bulk schedules upload (admin)
-shipmentsRouter.post('/flight-schedules/bulk', requireAuth, async (req: any, res) => {
+shipmentsRouter.post('/flight-schedules/bulk', requireAuth, requireAnyRole(['admin', 'warehouse']), async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin') return res.status(403).json({ success: false, error: 'Forbidden' });
     const items = Array.isArray(req.body) ? req.body : [];
     if (!items.length) return res.status(400).json({ success: false, error: 'No schedules provided' });
     await prisma.flightSchedule.createMany({ data: items });
@@ -432,9 +416,8 @@ shipmentsRouter.post('/flight-schedules/bulk', requireAuth, async (req: any, res
   } catch { res.status(500).json({ success: false, error: 'Failed to upload schedules' }); }
 });
 
-shipmentsRouter.post('/flight-schedules', requireAuth, async (req: any, res) => {
+shipmentsRouter.post('/flight-schedules', requireAuth, requireAnyRole(['admin', 'warehouse']), async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin' && req.user?.role !== 'warehouse') return res.status(403).json({ success: false, error: 'Forbidden' });
     const created = await prisma.flightSchedule.create({ data: req.body });
     res.status(201).json({ success: true, data: created });
   } catch (e) { res.status(500).json({ success: false, error: 'Failed to create flight schedule' }); }
@@ -442,7 +425,6 @@ shipmentsRouter.post('/flight-schedules', requireAuth, async (req: any, res) => 
 
 shipmentsRouter.put('/flight-schedules/:id', requireAuth, async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin' && req.user?.role !== 'warehouse') return res.status(403).json({ success: false, error: 'Forbidden' });
     const updated = await prisma.flightSchedule.update({ where: { id: req.params.id }, data: req.body });
     res.json({ success: true, data: updated });
   } catch (e) { res.status(500).json({ success: false, error: 'Failed to update flight schedule' }); }
@@ -450,7 +432,6 @@ shipmentsRouter.put('/flight-schedules/:id', requireAuth, async (req: any, res) 
 
 shipmentsRouter.delete('/flight-schedules/:id', requireAuth, async (req: any, res) => {
   try {
-    if (req.user?.role !== 'admin' && req.user?.role !== 'warehouse') return res.status(403).json({ success: false, error: 'Forbidden' });
     await prisma.flightSchedule.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, error: 'Failed to delete flight schedule' }); }
