@@ -34,7 +34,7 @@ export const notificationController = {
   // Get all notifications for the current user
   getUserNotifications: async (req: Request, res: Response) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.sub;
       const { page = 1, limit = 20, unreadOnly = false } = req.query;
       
       const skip = (Number(page) - 1) * Number(limit);
@@ -79,7 +79,7 @@ export const notificationController = {
   markAsRead: async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const userId = req.user!.id;
+      const userId = req.user!.sub;
 
       const notification = await prisma.notification.updateMany({
         where: {
@@ -114,7 +114,7 @@ export const notificationController = {
   // Mark all notifications as read
   markAllAsRead: async (req: Request, res: Response) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.sub;
 
       await prisma.notification.updateMany({
         where: {
@@ -143,7 +143,7 @@ export const notificationController = {
   deleteNotification: async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const userId = req.user!.id;
+      const userId = req.user!.sub;
 
       const notification = await prisma.notification.deleteMany({
         where: {
@@ -175,7 +175,7 @@ export const notificationController = {
   // Get unread notification count
   getUnreadCount: async (req: Request, res: Response) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.sub;
 
       const count = await prisma.notification.count({
         where: {

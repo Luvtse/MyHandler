@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { hasAnyRole } from '../../services/authService';
 import prisma from '../../utils/prisma';
 
 import { z } from 'zod';
@@ -29,7 +30,8 @@ export const invoiceController = {
       if (!req.user) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
-      const userId = req.user.id;
+      // req.user is the JWT payload: the user id lives in `sub` (there is no `id`).
+      const userId = String(req.user.sub);
       const validatedData = createInvoiceSchema.parse(req.body);
       
       // Generate invoice number (format: INV-YYYYMMDD-XXXX)
@@ -94,8 +96,10 @@ export const invoiceController = {
       if (!req.user) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
-      const userId = req.user.id;
-      const isAdmin = req.user.role === 'admin' || req.user.secondaryRoles?.some((r: { role: string }) => r.role === 'finance');
+      // req.user is the JWT payload: the user id lives in `sub` (there is no `id`).
+      const userId = String(req.user.sub);
+      // Secondary roles are stored in the DB, not in the token; check them server-side.
+      const isAdmin = await hasAnyRole(req, ['admin', 'finance']);
       
       const invoices = await prisma.invoice.findMany({
         where: isAdmin ? {} : { userId: String(userId) },
@@ -143,8 +147,10 @@ export const invoiceController = {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
       const { id } = req.params;
-      const userId = req.user.id;
-      const isAdmin = req.user.role === 'admin' || req.user.secondaryRoles?.some((r: { role: string }) => r.role === 'finance');
+      // req.user is the JWT payload: the user id lives in `sub` (there is no `id`).
+      const userId = String(req.user.sub);
+      // Secondary roles are stored in the DB, not in the token; check them server-side.
+      const isAdmin = await hasAnyRole(req, ['admin', 'finance']);
       
       const invoice = await prisma.invoice.findUnique({
         where: { id },
@@ -213,8 +219,10 @@ export const invoiceController = {
       }
       const { id } = req.params;
       const { status } = req.body;
-      const userId = req.user.id;
-      const isAdmin = req.user.role === 'admin' || req.user.secondaryRoles?.some((r: { role: string }) => r.role === 'finance');
+      // req.user is the JWT payload: the user id lives in `sub` (there is no `id`).
+      const userId = String(req.user.sub);
+      // Secondary roles are stored in the DB, not in the token; check them server-side.
+      const isAdmin = await hasAnyRole(req, ['admin', 'finance']);
       
       // Validate status
       if (!['DRAFT', 'SENT', 'PAID', 'OVERDUE', 'CANCELLED'].includes(status)) {
@@ -270,8 +278,10 @@ export const invoiceController = {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
       const { id } = req.params;
-      const userId = req.user.id;
-      const isAdmin = req.user.role === 'admin' || req.user.secondaryRoles?.some((r: { role: string }) => r.role === 'finance');
+      // req.user is the JWT payload: the user id lives in `sub` (there is no `id`).
+      const userId = String(req.user.sub);
+      // Secondary roles are stored in the DB, not in the token; check them server-side.
+      const isAdmin = await hasAnyRole(req, ['admin', 'finance']);
       
       // Check if invoice exists and user has access
       const invoice = await prisma.invoice.findUnique({

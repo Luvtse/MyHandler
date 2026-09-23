@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { hasAnyRole } from '../../services/authService';
 import prisma from '../../utils/prisma';
 import { emailService } from '../../services/emailService';
 
@@ -7,7 +8,7 @@ export const payoutRequestController = {
   create: async (req: Request, res: Response) => {
     try {
       const { amount, currency, paymentMethod, bankAccount, mobileNumber, description } = req.body;
-      const userId = req.user?.id;
+      const userId = req.user?.sub;
 
       if (!userId) {
         return res.status(401).json({ success: false, error: 'Unauthorized: user missing' });
@@ -200,7 +201,7 @@ export const payoutRequestController = {
     try {
       const { id } = req.params;
       const { status, rejectionReason, notes } = req.body;
-      const userId = req.user!.id;
+      const userId = req.user!.sub;
 
       const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'PROCESSING', 'COMPLETED', 'CANCELLED'];
       if (!validStatuses.includes(status)) {
