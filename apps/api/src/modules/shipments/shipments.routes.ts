@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { shipmentsService } from './shipments.service';
 import { etaService } from './eta.service';
-import { requireAuth, requireAnyRole } from '../../services/authService';
+import { requireAuth, requireAnyRole, hasAnyRole } from '../../services/authService';
 import prisma from '../../utils/prisma';
 import { emailService } from '../../services/emailService';
 import { audit } from '../../middlewares/auditLog';
@@ -74,12 +74,10 @@ shipmentsRouter.get('/:id', requireAuth, async (req: any, res) => {
       });
     }
 
-    // Check if user can access this shipment
-    const userRole = req.user?.role;
-    const userId = req.user?.sub;
-    const canViewAllShipments = ['admin', 'finance', 'report', 'warehouse', 'marketing'].includes(userRole || '');
+    // Staff roles (incl. DB secondary roles) may view any shipment; others must own it.
+    const canViewAllShipments = await hasAnyRole(req, ['admin', 'finance', 'report', 'warehouse', 'operations']);
     
-    if (!canViewAllShipments && shipment.userId !== userId) {
+    if (!canViewAllShipments && shipment.userId !== req.user?.sub) {
       return res.status(403).json({
         success: false,
         error: 'You do not have permission to view this shipment'
@@ -160,12 +158,10 @@ shipmentsRouter.put('/:id', requireAuth, async (req: any, res) => {
       });
     }
 
-    // Check authorization
-    const userRole = req.user?.role;
-    const userId = req.user?.sub;
-    const canUpdateAllShipments = ['admin', 'warehouse', 'marketing'].includes(userRole || '');
+    // Staff roles (incl. DB secondary roles) may update any shipment; owners may update their own.
+    const canUpdateAllShipments = await hasAnyRole(req, ['admin', 'warehouse', 'operations']);
     
-    if (!canUpdateAllShipments && existingShipment.userId !== userId) {
+    if (!canUpdateAllShipments && existingShipment.userId !== req.user?.sub) {
       return res.status(403).json({
         success: false,
         error: 'You do not have permission to update this shipment'
@@ -198,12 +194,10 @@ shipmentsRouter.delete('/:id', requireAuth, async (req: any, res) => {
       });
     }
 
-    // Check authorization
-    const userRole = req.user?.role;
-    const userId = req.user?.sub;
-    const canDeleteAllShipments = ['admin', 'marketing'].includes(userRole || '');
+    // Deletion is admin-only (secondary admin role counts); owners cannot delete shipments.
+    const canDelete = await hasAnyRole(req, ['admin']);
     
-    if (!canDeleteAllShipments && existingShipment.userId !== userId) {
+    if (!canDelete) {
       return res.status(403).json({
         success: false,
         error: 'You do not have permission to delete this shipment'
@@ -258,10 +252,8 @@ shipmentsRouter.get('/:id/eta', requireAuth, async (req: any, res) => {
     if (!shipment) {
       return res.status(404).json({ success: false, error: 'Shipment not found' });
     }
-    const userRole = req.user?.role;
-    const userId = req.user?.sub;
-    const canViewAll = ['admin', 'finance', 'report', 'warehouse', 'marketing'].includes(userRole || '');
-    if (!canViewAll && shipment.userId !== userId) {
+    const canViewAll = await hasAnyRole(req, ['admin', 'finance', 'report', 'warehouse', 'operations']);
+    if (!canViewAll && shipment.userId !== req.user?.sub) {
       return res.status(403).json({ success: false, error: 'Forbidden' });
     }
     const originCity = String((shipment as any).originCity || '').trim();
@@ -449,12 +441,10 @@ shipmentsRouter.post('/:id/tracking-events', requireAuth, async (req: any, res) 
       });
     }
 
-    // Check authorization - allow admin, warehouse, marketing, driver roles or shipment owner
-    const userRole = req.user?.role;
-    const userId = req.user?.sub;
-    const canUpdateAllShipments = ['admin', 'warehouse', 'marketing', 'driver'].includes(userRole || '');
+    // Allow staff roles (incl. DB secondary roles) or the shipment owner
+    const canUpdateAllShipments = await hasAnyRole(req, ['admin', 'warehouse', 'driver', 'operations']);
     
-    if (!canUpdateAllShipments && existingShipment.userId !== userId) {
+    if (!canUpdateAllShipments && existingShipment.userId !== req.user?.sub) {
       return res.status(403).json({
         success: false,
         error: 'You do not have permission to add tracking events to this shipment'
@@ -491,7 +481,7 @@ shipmentsRouter.post('/:id/tracking-events', requireAuth, async (req: any, res) 
 });
 
 // POST /api/shipments/:id/schedule-pickup - Schedule pickup
-shipmentsRouter.post('/:id/schedule-pickup', async (req: any, res) => {
+shipmentsRouter.post('/:id/schedule-pickup', requireAuth, async (req: any, res) => {
   try {
     // Check if user can access this shipment
     const existingShipment = await shipmentsService.findById(req.params.id);
@@ -502,12 +492,11 @@ shipmentsRouter.post('/:id/schedule-pickup', async (req: any, res) => {
       });
     }
 
-    // Check authorization - only admin and warehouse can schedule pickups
-    const userRole = req.user?.role;
-    const userId = req.user?.sub;
-    const canUpdateAllShipments = ['admin', 'warehouse', 'marketing'].includes(userRole || '');
-    
-    if (!canUpdateAllShipments && existingShipment.userId !== userId) {
+    // Authorization: staff roles (incl. DB secondary roles) may act on any
+    // shipment; everyone else must own it.
+    const isStaff = await hasAnyRole(req, ['admin', 'warehouse', 'operations']);
+
+    if (!isStaff && existingShipment.userId !== req.user?.sub) {
       return res.status(403).json({
         success: false,
         error: 'You do not have permission to schedule pickup for this shipment'
@@ -529,18 +518,16 @@ shipmentsRouter.post('/:id/schedule-pickup', async (req: any, res) => {
 });
 
 // POST /api/shipments/:id/retry-awb - Retry AWB generation for temporary AWBs
-shipmentsRouter.post('/:id/retry-awb', async (req: any, res) => {
+shipmentsRouter.post('/:id/retry-awb', requireAuth, async (req: any, res) => {
   try {
     const existingShipment = await shipmentsService.findById(req.params.id);
     if (!existingShipment) {
       return res.status(404).json({ success: false, error: 'Shipment not found' });
     }
 
-    const userRole = req.user?.role;
-    const userId = req.user?.sub;
-    const canUpdateAllShipments = ['admin', 'warehouse', 'marketing'].includes(userRole || '');
+    const isStaff = await hasAnyRole(req, ['admin', 'warehouse', 'operations']);
 
-    if (!canUpdateAllShipments && existingShipment.userId !== userId) {
+    if (!isStaff && existingShipment.userId !== req.user?.sub) {
       return res.status(403).json({ success: false, error: 'You do not have permission to retry AWB for this shipment' });
     }
 
