@@ -1,26 +1,44 @@
 import { env } from './env';
 
+const isTest = env.nodeEnv === 'test' || Boolean(process.env.VITEST);
+
+/**
+ * Return a required secret or fail fast. Payment processor credentials must
+ * never silently fall back to hardcoded test keys — previously the processors
+ * shipped defaults like 'CHAPASECRET_TEST_KEY' / 'sk_test_placeholder', which
+ * meant misconfigured deployments "worked" while sending traffic with bogus
+ * (or worse, shared public test) credentials.
+ */
+export function requireSecret(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    if (isTest) return `test-placeholder-${name}`;
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
 const config = {
   env,
   stripe: {
-    secretKey: process.env.STRIPE_SECRET_KEY || '',
+    secretKey: requireSecret('STRIPE_SECRET_KEY'),
   },
   paypal: {
-    clientId: process.env.PAYPAL_CLIENT_ID || '',
-    clientSecret: process.env.PAYPAL_CLIENT_SECRET || '',
+    clientId: requireSecret('PAYPAL_CLIENT_ID'),
+    clientSecret: requireSecret('PAYPAL_CLIENT_SECRET'),
     sandbox: process.env.PAYPAL_SANDBOX !== 'false',
   },
   chapa: {
-    secretKey: process.env.CHAPA_SECRET_KEY || '',
+    secretKey: requireSecret('CHAPA_SECRET_KEY'),
   },
   telebirr: {
-    appId: process.env.TELEBIRR_APP_ID || '',
-    appKey: process.env.TELEBIRR_APP_KEY || '',
-    publicKey: process.env.TELEBIRR_PUBLIC_KEY || '',
+    appId: requireSecret('TELEBIRR_APP_ID'),
+    appKey: requireSecret('TELEBIRR_APP_KEY'),
+    publicKey: requireSecret('TELEBIRR_PUBLIC_KEY'),
   },
   cbe: {
-    merchantId: process.env.CBE_MERCHANT_ID || '',
-    apiKey: process.env.CBE_API_KEY || '',
+    merchantId: requireSecret('CBE_MERCHANT_ID'),
+    apiKey: requireSecret('CBE_API_KEY'),
   },
 };
 

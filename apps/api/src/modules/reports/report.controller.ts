@@ -188,15 +188,19 @@ export const reportController = {
         },
       ];
 
-      // Filter reports based on user role
-      const user = req.user as any;
-      const userRole = user.role;
+      // Filter reports based on user role (primary JWT role OR DB secondary
+      // roles). `Array.prototype.filter` cannot be async, so resolve the two
+      // role checks once up front.
+      const [canViewLeaves, canViewFinancial] = await Promise.all([
+        hasAnyRole(req, ['admin', 'hr', 'hr_manager', 'hr_staff']),
+        hasAnyRole(req, ['admin', 'finance']),
+      ]);
       const availableReports = reports.filter(report => {
         if (report.id === 'leaves') {
-          return await hasAnyRole(req, ['admin', 'hr', 'hr_manager', 'hr_staff']);
+          return canViewLeaves;
         }
         if (report.id === 'financial') {
-          return await hasAnyRole(req, ['admin', 'finance']);
+          return canViewFinancial;
         }
         return true;
       });

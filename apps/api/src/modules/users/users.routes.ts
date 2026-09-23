@@ -3,6 +3,7 @@ import prisma from '../../utils/prisma';
 
 import { requireAuth, requirePermission } from '../../services/authService';
 import * as bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { z } from 'zod';
 
 export const usersRouter = Router();
@@ -237,10 +238,20 @@ usersRouter.get('/:id', requirePermission('user:read_all'), async (req, res) => 
 });
 usersRouter.post('/', requirePermission('user:create'), async (req, res) => {
   try {
-    const { name, email, role, phone, password = 'temp123456' } = req.body;
-    
+    const { name, email, role, phone } = req.body;
+
     if (!name || !email || !role || !phone) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Staff/user provisioning MUST go through the invite flow
+    // (POST /api/auth/admin/invite -> POST /api/invite/complete), where the
+    // user sets their own password. The old `password = 'temp123456'` default
+    // let accounts exist with a known shared password.
+    if (req.body.password !== undefined) {
+      return res.status(400).json({
+        error: 'Passwords cannot be set via this endpoint. Create the user with an invitation instead: POST /api/auth/admin/invite.',
+      });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -248,25 +259,32 @@ usersRouter.post('/', requirePermission('user:create'), async (req, res) => {
       return res.status(409).json({ error: 'Email already exists' });
     }
 
-    const hashed = await bcrypt.hash(password, 10);
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
     const user = await prisma.user.create({
       data: {
         name,
         email,
         role,
         phone: String(phone),
-        password: hashed
-      }
+        password: null,
+        isInvited: true,
+        inviteToken,
+        inviteExpiresAt: expires,
+      },
     });
 
-    res.status(201).json({ 
+    res.status(201).json({
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
         createdAt: user.createdAt
-      }
+      },
+      inviteLink: `/invite?token=${inviteToken}`,
+      message: 'User created as invited. Share the invite link so they can set their own password.'
     });
   } catch (error) {
     console.error('Error creating user:', error);
