@@ -18,6 +18,7 @@ import { notificationRouter } from '../modules/notifications/notification.routes
 import { adminRouter } from '../modules/admin/admin.routes';
 import { reportRouter } from '../modules/reports/report.routes';
 import { executiveRouter } from '../modules/executive/executive.routes';
+import { opsRouter } from '../modules/ops/ops.routes';
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
@@ -49,6 +50,7 @@ apiRouter.use('/notifications', notificationRouter);
 apiRouter.use('/admin', adminRouter);
 apiRouter.use('/reports', reportRouter);
 apiRouter.use('/executive', executiveRouter);
+apiRouter.use('/ops', opsRouter);
 
 
 // Complete invitation: set password for invited internal users

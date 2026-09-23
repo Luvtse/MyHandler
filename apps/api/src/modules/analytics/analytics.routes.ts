@@ -13,7 +13,7 @@ analyticsRouter.get(
   '/regional/:region',
   requireRole(['admin', 'regional_manager']),
   catchAsync(async (req, res) => {
-    const data = await getRegionalData(req.params.region);
+    const data = await getRegionalData(String(req.params.region));
     res.json({ success: true, data });
   }),
 );
