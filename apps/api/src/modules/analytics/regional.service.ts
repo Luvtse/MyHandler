@@ -191,10 +191,12 @@ export async function getRegionalData(regionParam: string): Promise<RegionalData
       distinct: ['userId'],
     }),
     Promise.all([
-      prisma.vehicle.count({ deletedAt: null }),
+      prisma.vehicle.count({ where: { deletedAt: null } }),
       prisma.vehicle.count({
-        deletedAt: null,
-        status: { in: ['inTransit' as any, 'reserved' as any] },
+        where: {
+          deletedAt: null,
+          status: { in: ['inTransit' as any, 'reserved' as any] },
+        },
       }),
     ]),
     prisma.shipment.count({

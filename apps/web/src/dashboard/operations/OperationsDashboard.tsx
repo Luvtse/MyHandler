@@ -1,8 +1,7 @@
 // @/dashboard/operations/OperationsDashboard.tsx
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   AlertTriangle,
-  Clock,
   MapPin,
   Truck,
   Zap,
@@ -14,35 +13,9 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/features/auth/hooks';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
-import { toast } from 'sonner';
-import { apiService } from '@/lib/api/client';
-
-// Define types (keep these)
-interface ShipmentFlowItem {
-  id: string;
-  origin: string;
-  destination: string;
-  status: 'in_transit' | 'delayed' | 'customs_hold' | 'misrouted' | 'delivered';
-  estimatedArrival: string;
-  vehicleId: string;
-  routeLoadPct: number;
-}
-
-interface SLAData {
-  onTimeRate: number;
-  totalDeliveries: number;
-  atRiskCount: number;
-}
-
-interface Incident {
-  id: string;
-  type: 'weather' | 'accident' | 'customs' | 'mechanical';
-  location: string;
-  severity: 'low' | 'medium' | 'high';
-  affectedRoutes: string[];
-}
+import { useOperationsData } from './useOperationsData';
+import type { ShipmentFlowItem, Incident } from '@/types/operations';
 
 // Utility functions (keep these)
 const getStatusColor = (status: ShipmentFlowItem['status']) => {
@@ -65,69 +38,12 @@ const getIncidentIcon = (type: Incident['type']) => {
   }
 };
 
-// API service functions — replace with your actual API client
-const fetchShipmentFlow = (): Promise<ShipmentFlowItem[]> =>
-  fetch('/api/operations/shipment-flow').then(res => res.json());
-
-const fetchSLAData = (): Promise<SLAData> =>
-  fetch('/api/operations/sla').then(res => res.json());
-
-const fetchIncidents = (): Promise<Incident[]> =>
-  fetch('/api/operations/incidents').then(res => res.json());
-
 const OperationsDashboard = () => {
-  const { user } = useAuth();
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [shipmentFlow, setShipmentFlow] = useState<ShipmentFlowItem[]>([]);
-  const [sla, setSLA] = useState<SLAData | null>(null);
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Single source of truth: /ops/shipments/live, /ops/sla, /ops/incidents/active
+  // (30s auto-refresh + manual refresh handled inside the hook).
+  const { data, loading, error, refresh } = useOperationsData();
 
-  const loadData = async () => {
-    try {
-      setIsRefreshing(true);
-      setError(null);
-
-      const [flow, slaData, incidentData] = await Promise.all([
-        fetchShipmentFlow(),
-        fetchSLAData(),
-        fetchIncidents(),
-      ]);
-
-      setShipmentFlow(flow);
-      setSLA(slaData);
-      setIncidents(incidentData);
-      setLastUpdated(new Date().toLocaleTimeString());
-    } catch (err) {
-      console.error('Failed to load operations data:', err);
-      setError('Failed to load dashboard data. Please try again.');
-      toast.error('Failed to fetch operations data');
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-  if (user?.role === 'operations') {
-    // Fire-and-forget audit log
-    apiService.request({
-      method: 'POST',
-      url: '/audit/logs',
-      data: {
-        action: 'VIEW_OPERATIONS_DASHBOARD',
-        resourceId: null,
-        metadata: { userAgent: navigator.userAgent },
-      },
-    }).catch(() => {
-      // Non-blocking — don’t disrupt UX if audit fails
-    });
-  }
-}, [user?.role]);
-
-  if (loading && !sla) {
+  if (loading && !data) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-muted-foreground">Loading operations data...</div>
@@ -135,14 +51,14 @@ const OperationsDashboard = () => {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold tracking-tight">Operations Center</h1>
         <Card>
           <CardContent className="py-8 text-center text-destructive">
             {error}
-            <Button variant="outline" onClick={loadData} className="mt-4">
+            <Button variant="outline" onClick={refresh} className="mt-4">
               Retry
             </Button>
           </CardContent>
@@ -150,6 +66,20 @@ const OperationsDashboard = () => {
       </div>
     );
   }
+
+  const shipmentFlow = data?.shipments ?? [];
+  const incidents = data?.incidents ?? [];
+  const sla = data?.sla ?? null;
+
+  // Derived real metrics (previously hardcoded placeholders)
+  const activeRoutes = new Set(
+    shipmentFlow.filter(s => s.status !== 'delivered').map(s => `${s.origin}→${s.destination}`),
+  ).size;
+  const inTransitVehicles = shipmentFlow.filter(s => s.vehicleId !== 'unassigned').length;
+  const avgLoadPct =
+    shipmentFlow.length === 0
+      ? 0
+      : Math.round(shipmentFlow.reduce((sum, s) => sum + s.routeLoadPct, 0) / shipmentFlow.length);
 
   return (
     <div className="space-y-6">
@@ -161,23 +91,33 @@ const OperationsDashboard = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {lastUpdated && (
+          {data?.lastUpdated && (
             <span className="text-sm text-muted-foreground">
-              Updated: {lastUpdated}
+              Updated: {new Date(data.lastUpdated).toLocaleTimeString()}
             </span>
           )}
           <Button
             variant="outline"
             size="sm"
-            onClick={loadData}
-            disabled={isRefreshing}
+            onClick={refresh}
+            disabled={loading}
             className="flex items-center gap-2"
           >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
       </div>
+
+      {/* Partial-failure banner: snapshot exists but last refresh failed */}
+      {error && data && (
+        <Card className="border-yellow-300 bg-yellow-50">
+          <CardContent className="py-3 text-sm text-yellow-800">
+            Showing data from {new Date(data.lastUpdated).toLocaleTimeString()} — latest
+            refresh failed ({error}).
+          </CardContent>
+        </Card>
+      )}
 
       {/* SLA & Capacity Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -199,8 +139,8 @@ const OperationsDashboard = () => {
             <MapPin className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24</div> {/* Replace with real data when available */}
-            <p className="text-xs text-muted-foreground">+2 vs yesterday</p>
+            <div className="text-2xl font-bold">{activeRoutes}</div>
+            <p className="text-xs text-muted-foreground">Origin → destination pairs in flight</p>
           </CardContent>
         </Card>
         <Card>
@@ -209,8 +149,10 @@ const OperationsDashboard = () => {
             <Truck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">78%</div> {/* Replace with real data */}
-            <p className="text-xs text-muted-foreground">Avg. load per vehicle</p>
+            <div className="text-2xl font-bold">{avgLoadPct}%</div>
+            <p className="text-xs text-muted-foreground">
+              Avg. load across {inTransitVehicles} tracked shipments
+            </p>
           </CardContent>
         </Card>
         <Card>
