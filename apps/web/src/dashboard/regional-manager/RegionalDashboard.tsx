@@ -84,16 +84,27 @@ const getMockData = (region: string) => {
 };
 
 const RegionalDashboard = () => {
-  const { region } = useParams<{ region: string }>();
+  const { region: regionParam } = useParams<{ region: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [metrics, setMetrics] = useState<RegionalMetrics | null>(null);
   const [insights, setInsights] = useState<RegionalInsight[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Use URL param as source of truth for the selected region
+  const currentRegion = regionParam || 'addis_ababa';
+
+  // Handle region change from selector — keep URL in sync
+  const handleRegionChange = (newRegion: string) => {
+    navigate(`/dashboard/regional/${newRegion}`);
+  };
+
   const refreshData = () => {
     setIsRefreshing(true);
     setTimeout(() => {
-      const data = getMockData(region || 'addis_ababa');
+      // NOTE: No backend endpoint exists yet for regional metrics.
+      // TODO: Replace with GET /api/regional/:region/metrics when available.
+      const data = getMockData(currentRegion);
       setMetrics(data);
       
       // Mock insights based on region
@@ -128,57 +139,7 @@ const RegionalDashboard = () => {
     refreshData();
     const interval = setInterval(refreshData, 300_000); // 5 mins
     return () => clearInterval(interval);
-  }, [region]);
-
-  const RegionalDashboard = () => {
-  const { region: regionParam } = useParams<{ region: string }>();
-  const navigate = useNavigate(); // ← Add this
-  const { user } = useAuth();
-  
-  // Use URL param as source of truth
-  const [currentRegion, setCurrentRegion] = useState(regionParam || 'addis_ababa');
-
-  // Handle region change from selector
-  const handleRegionChange = (newRegion: string) => {
-    setCurrentRegion(newRegion);
-    navigate(`/dashboard/regional/${newRegion}`);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Regional Dashboard: {metrics?.region}
-          </h1>
-          <p className="text-muted-foreground">
-            Localized performance and operational health
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* 👇 ADD REGION SELECTOR HERE */}
-          <RegionSelector 
-            currentRegion={currentRegion} 
-            onRegionChange={handleRegionChange}
-            className="w-48" 
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={refreshData}
-            disabled={isRefreshing}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* ... rest of dashboard */}
-    </div>
-  );
-};
+  }, [currentRegion]);
 
   const getSeverityColor = (severity: RegionalInsight['severity']) => {
     switch (severity) {
@@ -210,16 +171,23 @@ const RegionalDashboard = () => {
             Localized performance and operational health
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={refreshData}
-          disabled={isRefreshing}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <RegionSelector
+            currentRegion={currentRegion}
+            onRegionChange={handleRegionChange}
+            className="w-48"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshData}
+            disabled={isRefreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* AI Insights Banner */}
@@ -362,7 +330,7 @@ const RegionalDashboard = () => {
             </div>
             <div className="text-right">
               <Button variant="outline" asChild>
-                <a href={`/dashboard/account?region=${region}`}>
+                <a href={`/dashboard/account?region=${currentRegion}`}>
                   View Client Details
                 </a>
               </Button>
