@@ -21,15 +21,4 @@ declare module 'express-serve-static-core' {
   interface Request {
     user?: AuthUser;
   }
-
-  // Express 4 always yields plain strings for route parameters. The installed
-  // @types/express-serve-static-core models `ParamsDictionary` values as
-  // `string | string[]` (to support Express-5 wildcard params), which is a
-  // false positive for this Express-4 app and produced ~67 TS2322 errors at
-  // every `where: { id: req.params.id }`. Merging in a flat `string` index
-  // signature narrows the effective member type to `string & string` = `string`
-  // for all keys, without touching any call sites.
-  interface ParamsDictionary {
-    [key: string]: string;
-  }
 }
