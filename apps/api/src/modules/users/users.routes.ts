@@ -2,9 +2,48 @@ import { Router } from 'express';
 import prisma from '../../utils/prisma';
 
 import { requireAuth, requirePermission } from '../../services/authService';
+import { audit } from '../../middlewares/auditLog';
 import * as bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { z } from 'zod';
+
+const USER_ROLES = [
+  'admin', 'customer', 'driver', 'warehouse', 'finance', 'report',
+  'hr_manager', 'hr_staff', 'service_point_agent', 'operations',
+  'fleet_manager', 'account_manager', 'coo', 'cfo', 'cmo', 'ceo',
+  'regional_manager',
+] as const;
+
+// Audit helper — fire-and-forget, never affects the request.
+function auditUser(req: any, action: string, entityId: string, changes?: Record<string, any>) {
+  audit({ req, action, entity: 'User', entityId, changes }).catch(() => {});
+}
+
+const updateUserSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  email: z.string().email().optional(),
+  role: z.enum(USER_ROLES).optional(),
+}).strict();
+
+const approvalSchema = z.object({
+  isApproved: z.boolean(),
+}).strict();
+
+const assignRoleSchema = z.object({
+  role: z.enum(USER_ROLES),
+}).strict();
+
+const resetPasswordSchema = z.object({
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+}).strict();
+
+const createUserSchema = z.object({
+  name: z.string().min(1).max(120),
+  email: z.string().email(),
+  role: z.enum(USER_ROLES),
+  phone: z.string().min(6).max(20),
+  password: z.never({ message: 'Passwords cannot be set via this endpoint. Use the invite flow.' }).optional(),
+}).strict();
 
 export const usersRouter = Router();
 
@@ -238,21 +277,17 @@ usersRouter.get('/:id', requirePermission('user:read_all'), async (req, res) => 
 });
 usersRouter.post('/', requirePermission('user:create'), async (req, res) => {
   try {
-    const { name, email, role, phone } = req.body;
-
-    if (!name || !email || !role || !phone) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
     // Staff/user provisioning MUST go through the invite flow
     // (POST /api/auth/admin/invite -> POST /api/invite/complete), where the
     // user sets their own password. The old `password = 'temp123456'` default
     // let accounts exist with a known shared password.
-    if (req.body.password !== undefined) {
+    const parsed = createUserSchema.safeParse(req.body);
+    if (!parsed.success) {
       return res.status(400).json({
-        error: 'Passwords cannot be set via this endpoint. Create the user with an invitation instead: POST /api/auth/admin/invite.',
+        error: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
       });
     }
+    const { name, email, role, phone } = parsed.data;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -275,6 +310,8 @@ usersRouter.post('/', requirePermission('user:create'), async (req, res) => {
       },
     });
 
+    auditUser(req, 'CREATE', user.id, { email, role, invited: true });
+
     res.status(201).json({
       user: {
         id: user.id,
@@ -293,8 +330,14 @@ usersRouter.post('/', requirePermission('user:create'), async (req, res) => {
 });
 usersRouter.patch('/:id', requirePermission('user:update_all'), async (req, res) => {
   try {
-    const { name, email, role, isActive } = req.body;
-    
+    const parsed = updateUserSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
+      });
+    }
+    const { name, email, role } = parsed.data;
+
     const user = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -313,6 +356,8 @@ usersRouter.patch('/:id', requirePermission('user:update_all'), async (req, res)
       }
     });
 
+    auditUser(req, 'UPDATE', updated.id, { fields: Object.keys(parsed.data) });
+
     res.json({ user: updated });
   } catch (error) {
     console.error('Error updating user:', error);
@@ -321,10 +366,13 @@ usersRouter.patch('/:id', requirePermission('user:update_all'), async (req, res)
 });
 usersRouter.patch('/:id/approval', requirePermission('user:update_all'), async (req, res) => {
   try {
-    const { isApproved } = req.body as { isApproved?: boolean };
-    if (typeof isApproved !== 'boolean') {
-      return res.status(400).json({ error: 'isApproved must be a boolean' });
+    const parsed = approvalSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
+      });
     }
+    const { isApproved } = parsed.data;
     const user = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -341,6 +389,7 @@ usersRouter.patch('/:id/approval', requirePermission('user:update_all'), async (
         updatedAt: true
       }
     });
+    auditUser(req, 'STATUS_CHANGE', updated.id, { field: 'isApproved', to: isApproved });
     res.json({ user: updated });
   } catch (error) {
     console.error('Error updating approval:', error);
@@ -355,6 +404,8 @@ usersRouter.delete('/:id', requirePermission('user:delete_all'), async (req, res
     }
 
     await prisma.user.delete({ where: { id: req.params.id } });
+    // Recorded after deletion so the trail entry survives even though the FK target is gone.
+    auditUser(req, 'DELETE', user.id, { email: user.email, role: user.role });
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
     console.error('Error deleting user:', error);
