@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { invoiceController } from './invoice.controller';
 import { paymentController } from './payment.controller';
-import { payoutRequestController } from './payout-request.controller';
-import { requireAuth } from '../../services/authService';
+import { payoutRequestController, PAYOUT_STAFF_ROLES } from './payout-request.controller';
+import { requireAuth, requireAnyRole } from '../../services/authService';
 import { analyticsController } from './analytics.controller';
 
 const router = Router();
@@ -23,12 +23,23 @@ router.post('/payments/process', paymentController.processPayment);
 router.put('/payments/:id/status', paymentController.updateStatus);
 router.get('/invoices/:invoiceId/payments', paymentController.getByInvoice);
 
-// Payout Request routes
+// Payout request routes — approve/reject/process/delete are staff-only.
+// (hasAnyRole also honors DB-stored secondary roles.)
 router.post('/payout-requests', payoutRequestController.create);
 router.get('/payout-requests', payoutRequestController.getAll);
 router.get('/payout-requests/:id', payoutRequestController.getById);
-router.patch('/payout-requests/:id/status', payoutRequestController.updateStatus);
-router.delete('/payout-requests/:id', payoutRequestController.delete);
+router.patch(
+  '/payout-requests/:id/status',
+  requireAnyRole(PAYOUT_STAFF_ROLES),
+  payoutRequestController.updateStatus
+);
+router.delete(
+  // Owners may cancel their own pending requests; staff may delete any.
+  // Ownership is enforced in the controller.
+  '/payout-requests/:id',
+  requireAnyRole([...PAYOUT_STAFF_ROLES, 'customer']),
+  payoutRequestController.delete
+);
 
   // Analytics routes
   router.get('/analytics/metrics', analyticsController.getMetrics);

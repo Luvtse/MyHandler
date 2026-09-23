@@ -3,6 +3,8 @@ import { hasAnyRole } from '../../services/authService';
 import prisma from '../../utils/prisma';
 import { emailService } from '../../services/emailService';
 
+export const PAYOUT_STAFF_ROLES = ['admin', 'finance', 'account_manager', 'cfo'];
+
 export const payoutRequestController = {
   // Create a new payout request
   create: async (req: Request, res: Response) => {
@@ -114,7 +116,12 @@ export const payoutRequestController = {
       if (status) {
         where.status = status;
       }
-      if (userId) {
+
+      // Ownership gate: non-staff users may only see their own requests.
+      const isStaff = await hasAnyRole(req, PAYOUT_STAFF_ROLES);
+      if (!isStaff) {
+        where.userId = (req as any).user!.sub;
+      } else if (userId) {
         where.userId = userId;
       }
 
@@ -183,6 +190,15 @@ export const payoutRequestController = {
         });
       }
 
+      // Ownership gate: non-staff users may only view their own requests.
+      const canViewAll = await hasAnyRole(req, PAYOUT_STAFF_ROLES);
+      if (!canViewAll && payoutRequest.userId !== (req as any).user!.sub) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to view this payout request'
+        });
+      }
+
       res.json({
         success: true,
         data: payoutRequest
@@ -203,6 +219,15 @@ export const payoutRequestController = {
       const { status, rejectionReason, notes } = req.body;
       const userId = req.user!.sub;
 
+      // Only payout staff (primary or DB secondary role) may transition statuses.
+      const isStaff = await hasAnyRole(req, PAYOUT_STAFF_ROLES);
+      if (!isStaff) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to update payout request status'
+        });
+      }
+
       const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'PROCESSING', 'COMPLETED', 'CANCELLED'];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({
@@ -219,6 +244,29 @@ export const payoutRequestController = {
         return res.status(404).json({
           success: false,
           error: 'Payout request not found'
+        });
+      }
+
+      // Status-machine gates: block illegal/skip transitions and self-approval.
+      const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+        PENDING: ['APPROVED', 'REJECTED', 'CANCELLED'],
+        APPROVED: ['PROCESSING', 'CANCELLED'],
+        REJECTED: [],
+        PROCESSING: ['COMPLETED'],
+        COMPLETED: [],
+        CANCELLED: [],
+      };
+      const allowedNext = ALLOWED_TRANSITIONS[existingRequest.status] ?? [];
+      if (status !== existingRequest.status && !allowedNext.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid status transition: ${existingRequest.status} -> ${status}`
+        });
+      }
+      if ((status === 'APPROVED' || status === 'REJECTED') && existingRequest.userId === userId) {
+        return res.status(403).json({
+          success: false,
+          error: 'You cannot approve or reject your own payout request'
         });
       }
 
@@ -320,6 +368,15 @@ export const payoutRequestController = {
         return res.status(404).json({
           success: false,
           error: 'Payout request not found'
+        });
+      }
+
+      // Only the owner or payout staff may delete.
+      const isStaff = await hasAnyRole(req, PAYOUT_STAFF_ROLES);
+      if (!isStaff && existingRequest.userId !== (req as any).user!.sub) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to delete this payout request'
         });
       }
 
