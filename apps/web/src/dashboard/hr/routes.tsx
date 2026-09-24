@@ -53,7 +53,14 @@ const HRHome = () => {
             ? employeesData.data
             : [];
 
-        const leaves = Array.isArray(leaveData?.data) ? leaveData.data : Array.isArray(leaveData) ? leaveData : [];
+        // The leave API returns { status:'success', leaves:[...], pagination } — there is no `.data` field.
+        const leaves = Array.isArray((leaveData as any)?.leaves)
+          ? (leaveData as any).leaves
+          : Array.isArray(leaveData?.data)
+            ? leaveData.data
+            : Array.isArray(leaveData)
+              ? leaveData
+              : [];
 
         const pendingHr = leaves.filter((l: any) => l && l.hrApproval === 'PENDING').length;
 
@@ -430,22 +437,244 @@ const TeamsList = () => {
   );
 };
 
+// Generic fetch helper for the detail views below (APIs return the entity directly).
+const useEntityDetail = <T extends { id: string }>(url: string) => {
+  const [entity, setEntity] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const { success, data } = await apiService.request({ method: 'GET', url });
+        if (!active) return;
+        if (success && data) {
+          setEntity((data as any).data ?? data);
+        } else {
+          setError('Failed to load record');
+        }
+      } catch {
+        if (active) setError('Failed to load record');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [url]);
+
+  return { entity, loading, error };
+};
+
+const DetailSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <Card sx={{ mb: 2 }}>
+    <CardContent>
+      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+        {title}
+      </Typography>
+      {children}
+    </CardContent>
+  </Card>
+);
+
 const DepartmentDetail = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { entity: dept, loading, error } = useEntityDetail<any>(`/hr/departments/${id}`);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error || !dept) {
+    return (
+      <Box sx={{ p: 2 }}>
+        <Typography color="error">{error || 'Department not found.'}</Typography>
+        <Button size="small" onClick={() => navigate('/dashboard/hr/departments')} sx={{ mt: 1 }}>
+          Back to departments
+        </Button>
+      </Box>
+    );
+  }
+
+  const employees: any[] = dept.employees || [];
+  const teams: any[] = dept.teams || [];
+
   return (
-    <Box sx={{ p: 2 }}>
-      <Typography variant="h6">Department Detail</Typography>
-      <Typography variant="body2" color="text.secondary">ID: {id}</Typography>
+    <Box sx={{ p: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6">{dept.name}</Typography>
+        <Button size="small" onClick={() => navigate('/dashboard/hr/departments')}>
+          Back
+        </Button>
+      </Box>
+
+      <DetailSection title="Overview">
+        <Typography variant="body2">
+          Manager:{' '}
+          {dept.manager ? `${dept.manager.firstName} ${dept.manager.lastName}` : 'Unassigned'}
+        </Typography>
+        <Typography variant="body2">Employees: {employees.length}</Typography>
+        <Typography variant="body2">Teams: {teams.length}</Typography>
+      </DetailSection>
+
+      <DetailSection title="Teams">
+        {teams.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            No teams in this department.
+          </Typography>
+        ) : (
+          teams.map((team: any) => (
+            <Typography
+              key={team.id}
+              variant="body2"
+              sx={{ cursor: 'pointer', color: 'primary.main' }}
+              onClick={() => navigate(`/dashboard/hr/teams/${team.id}`)}
+            >
+              {team.name}
+            </Typography>
+          ))
+        )}
+      </DetailSection>
+
+      <DetailSection title="Employees">
+        {employees.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            No employees in this department.
+          </Typography>
+        ) : (
+          <TableContainer component={Paper}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Position</TableCell>
+                  <TableCell>Status</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {employees.map((emp: any) => (
+                  <TableRow
+                    key={emp.id}
+                    hover
+                    sx={{ cursor: 'pointer' }}
+                    onClick={() => navigate(`/dashboard/hr/employees/${emp.id}`)}
+                  >
+                    <TableCell>
+                      {emp.firstName} {emp.lastName}
+                    </TableCell>
+                    <TableCell>{emp.position || '-'}</TableCell>
+                    <TableCell>{emp.employmentStatus}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </DetailSection>
     </Box>
   );
 };
 
 const TeamDetail = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { entity: team, loading, error } = useEntityDetail<any>(`/hr/teams/${id}`);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error || !team) {
+    return (
+      <Box sx={{ p: 2 }}>
+        <Typography color="error">{error || 'Team not found.'}</Typography>
+        <Button size="small" onClick={() => navigate('/dashboard/hr/teams')} sx={{ mt: 1 }}>
+          Back to teams
+        </Button>
+      </Box>
+    );
+  }
+
+  const employees: any[] = team.employees || [];
+
   return (
-    <Box sx={{ p: 2 }}>
-      <Typography variant="h6">Team Detail</Typography>
-      <Typography variant="body2" color="text.secondary">ID: {id}</Typography>
+    <Box sx={{ p: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6">{team.name}</Typography>
+        <Button size="small" onClick={() => navigate('/dashboard/hr/teams')}>
+          Back
+        </Button>
+      </Box>
+
+      <DetailSection title="Overview">
+        <Typography variant="body2">
+          Department:{' '}
+          {team.department ? (
+            <span
+              style={{ cursor: 'pointer', color: '#1976d2' }}
+              onClick={() => navigate(`/dashboard/hr/departments/${team.department.id}`)}
+            >
+              {team.department.name}
+            </span>
+          ) : (
+            'Unassigned'
+          )}
+        </Typography>
+        <Typography variant="body2">
+          Leader:{' '}
+          {team.leader ? `${team.leader.firstName} ${team.leader.lastName}` : 'Unassigned'}
+        </Typography>
+        <Typography variant="body2">Members: {employees.length}</Typography>
+      </DetailSection>
+
+      <DetailSection title="Members">
+        {employees.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            No members in this team.
+          </Typography>
+        ) : (
+          <TableContainer component={Paper}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Position</TableCell>
+                  <TableCell>Status</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {employees.map((emp: any) => (
+                  <TableRow
+                    key={emp.id}
+                    hover
+                    sx={{ cursor: 'pointer' }}
+                    onClick={() => navigate(`/dashboard/hr/employees/${emp.id}`)}
+                  >
+                    <TableCell>
+                      {emp.firstName} {emp.lastName}
+                    </TableCell>
+                    <TableCell>{emp.position || '-'}</TableCell>
+                    <TableCell>{emp.employmentStatus}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </DetailSection>
     </Box>
   );
 };
@@ -479,7 +708,14 @@ const HRRoutes = () => {
             </HRRoleGuard>
           }
         />
-        <Route path="employees/:id" element={<EmployeeDetail />} />
+        <Route
+          path="employees/:id"
+          element={
+            <HRRoleGuard allowedRoles={['admin', 'hr_manager']}>
+              <EmployeeDetail />
+            </HRRoleGuard>
+          }
+        />
         <Route path="employees" element={<EmployeesList />} />
 
         {/* DEPARTMENT ROUTES */}
@@ -499,7 +735,14 @@ const HRRoutes = () => {
             </HRRoleGuard>
           }
         />
-        <Route path="departments/:id" element={<DepartmentDetail />} />
+        <Route
+          path="departments/:id"
+          element={
+            <HRRoleGuard allowedRoles={['admin', 'hr_manager']}>
+              <DepartmentDetail />
+            </HRRoleGuard>
+          }
+        />
         <Route path="departments" element={<DepartmentsList />} />
 
         {/* TEAM ROUTES */}
@@ -519,11 +762,25 @@ const HRRoutes = () => {
             </HRRoleGuard>
           }
         />
-        <Route path="teams/:id" element={<TeamDetail />} />
+        <Route
+          path="teams/:id"
+          element={
+            <HRRoleGuard allowedRoles={['admin', 'hr_manager']}>
+              <TeamDetail />
+            </HRRoleGuard>
+          }
+        />
         <Route path="teams" element={<TeamsList />} />
 
         {/* CORRESPONDENCE ROUTES */}
-        <Route path="correspondence" element={<CorrespondenceList />} />
+        <Route
+          path="correspondence"
+          element={
+            <HRRoleGuard allowedRoles={['admin', 'hr_manager']}>
+              <CorrespondenceList />
+            </HRRoleGuard>
+          }
+        />
         <Route
           path="correspondence/new"
           element={
@@ -540,10 +797,24 @@ const HRRoutes = () => {
             </HRRoleGuard>
           }
         />
-        <Route path="correspondence/:id" element={<CorrespondenceDetail />} />
+        <Route
+          path="correspondence/:id"
+          element={
+            <HRRoleGuard allowedRoles={['admin', 'hr_manager']}>
+              <CorrespondenceDetail />
+            </HRRoleGuard>
+          }
+        />
 
         {/* OTHER HR ROUTES */}
-        <Route path="org-chart" element={<OrgChartPage />} />
+        <Route
+          path="org-chart"
+          element={
+            <HRRoleGuard allowedRoles={['admin', 'hr_manager']}>
+              <OrgChartPage />
+            </HRRoleGuard>
+          }
+        />
         <Route
           path="reports"
           element={
