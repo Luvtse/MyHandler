@@ -19,7 +19,174 @@ function validateAndConvertStatus(canonical: string): ShipmentStatus {
   return enumValue;
 }
 
+// Fields that may be written when creating/updating a shipment. Anything else
+// in the request body (id, userId, createdAt, nested relations, etc.) is
+// stripped so clients cannot inject arbitrary Prisma payload keys.
+const SHIPMENT_EDITABLE_FIELDS = [
+  'reference', 'originAddress', 'originCompany', 'originCity', 'originCountry',
+  'destinationAddress', 'destinationCompany', 'destinationCity', 'destinationCountry',
+  'weightKg', 'dimensionsCm', 'serviceLevel', 'notes', 'chargesAmount',
+  'chargesCurrency', 'paymentType', 'accountNumber', 'status',
+  'originAirportCode', 'destinationAirportCode',
+] as const;
+
+function pickShipmentFields(data: any): Record<string, any> {
+  const out: Record<string, any> = {};
+  if (!data || typeof data !== 'object') return out;
+  for (const key of SHIPMENT_EDITABLE_FIELDS) {
+    if (data[key] !== undefined) out[key] = data[key];
+  }
+  return out;
+}
+
 export const shipmentsService = {
+  // Resolve a shipment by database id OR by AWB reference (the frontend route
+  // params carry AWBs, while some callers pass ids). Returns null if not found.
+  async findByIdOrReference(idOrReference: string) {
+    if (!idOrReference) return null;
+    const byId = await prisma.shipment.findUnique({ where: { id: idOrReference } });
+    if (byId) return byId;
+    return prisma.shipment.findFirst({
+      where: { reference: idOrReference },
+      orderBy: { createdAt: 'desc' },
+    });
+  },
+
+  // ---- Drafts -----------------------------------------------------------
+  // A draft is a Shipment row with isDraft=true and a provisional DRAFT-*
+  // reference. No real AWB is allocated until the draft is finalized.
+
+  async createDraft(userId: string, data: any) {
+    const fields = pickShipmentFields(data);
+    const pt = normalizePaymentType(fields.paymentType ?? data.paymentType);
+    const chargesAmount = typeof fields.chargesAmount === 'number'
+      ? fields.chargesAmount
+      : Number(fields.chargesAmount ?? data.chargesInformation?.amount ?? 0) || 0;
+
+    return prisma.shipment.create({
+      data: {
+        ...fields,
+        userId,
+        paymentType: pt ?? PaymentType.PREPAID,
+        accountNumber: pt === PaymentType.ACCOUNT && fields.accountNumber
+          ? String(fields.accountNumber).trim()
+          : fields.accountNumber != null ? String(fields.accountNumber).trim() : null,
+        originAddress: fields.originAddress ?? '',
+        destinationAddress: fields.destinationAddress ?? '',
+        weightKg: typeof fields.weightKg === 'number' ? fields.weightKg : Number(fields.weightKg ?? data.totalWeight ?? 0),
+        serviceLevel: fields.serviceLevel ?? data.serviceType ?? 'standard',
+        chargesAmount,
+        chargesCurrency: fields.chargesCurrency ?? data.chargesInformation?.currency ?? 'USD',
+        reference: `DRAFT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        status: ShipmentStatus.ORDER_RECEIVED,
+        isDraft: true,
+      },
+    });
+  },
+
+  async findDraftById(id: string) {
+    const shipment = await prisma.shipment.findUnique({ where: { id } });
+    return shipment && shipment.isDraft ? shipment : null;
+  },
+
+  async listDrafts(userId?: string) {
+    return prisma.shipment.findMany({
+      where: { isDraft: true, ...(userId ? { userId } : {}) },
+      orderBy: { updatedAt: 'desc' },
+    });
+  },
+
+  async updateDraft(id: string, data: any) {
+    const existing = await this.findDraftById(id);
+    if (!existing) {
+      const err: any = new Error('Draft not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    const fields = pickShipmentFields(data);
+    if (fields.paymentType) {
+      const pt = normalizePaymentType(fields.paymentType);
+      if (pt) fields.paymentType = pt;
+    }
+    return prisma.shipment.update({ where: { id }, data: fields });
+  },
+
+  async deleteDraft(id: string) {
+    const existing = await this.findDraftById(id);
+    if (!existing) {
+      const err: any = new Error('Draft not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    return prisma.shipment.delete({ where: { id } });
+  },
+
+  // Finalize a draft: allocate a real AWB, persist any last edits and mark it
+  // as a live shipment. Runs inside a transaction so a failure never leaves a
+  // half-finalized draft behind.
+  async finalizeDraft(id: string, data: any, userId?: string) {
+    return prisma.$transaction(async (tx) => {
+      const draft = await tx.shipment.findUnique({ where: { id } });
+      if (!draft || !draft.isDraft) {
+        const err: any = new Error('Draft not found');
+        err.statusCode = 404;
+        throw err;
+      }
+      if (userId && draft.userId !== userId) {
+        const err: any = new Error('Forbidden');
+        err.statusCode = 403;
+        throw err;
+      }
+
+      const awb = await awbGenerationService.generateNextAwb(tx);
+      const validation = awbGenerationService.validateAWB(awb);
+      if (!validation.isValid) {
+        throw new Error(`Generated invalid AWB: ${validation.error}`);
+      }
+
+      const fields = pickShipmentFields(data || {});
+      if (fields.paymentType) {
+        const pt = normalizePaymentType(fields.paymentType);
+        if (pt) fields.paymentType = pt;
+      }
+      if (typeof fields.status === 'string') {
+        fields.status = validateAndConvertStatus(fields.status);
+      } else {
+        delete fields.status;
+      }
+      if (fields.originCity) {
+        const ap = await tx.airport.findFirst({ where: { city: { equals: String(fields.originCity).trim(), mode: 'insensitive' } } });
+        if (ap?.code) fields.originAirportCode = ap.code;
+      }
+      if (fields.destinationCity) {
+        const ap = await tx.airport.findFirst({ where: { city: { equals: String(fields.destinationCity).trim(), mode: 'insensitive' } } });
+        if (ap?.code) fields.destinationAirportCode = ap.code;
+      }
+
+      const updated = await tx.shipment.update({
+        where: { id },
+        data: {
+          ...fields,
+          reference: awb,
+          isDraft: false,
+          status: fields.status ?? ShipmentStatus.ORDER_RECEIVED,
+        },
+      });
+
+      await tx.trackingEvent.create({
+        data: {
+          shipmentId: id,
+          status: updated.status,
+          location: `${updated.originCity || ''}`.trim() || 'Origin',
+          description: 'Shipment order received',
+        },
+      });
+
+      AWB_GENERATION_METRICS.successes++;
+      return updated;
+    });
+  },
+
   async create(data: any) {
     return prisma.$transaction(async (tx) => {
       try {
@@ -183,14 +350,17 @@ export const shipmentsService = {
 
   // ... keep other existing methods (findAll, findById, update, etc.)
   async findAll(page = 1, limit = 10, filters = {}, userRole?: string, userId?: string) {
-    const skip = (page - 1) * limit;
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const skip = (page - 1) * safeLimit;
     const where = await buildWhereClause(filters, userRole, userId);
-    
+    // Drafts are only visible via the /shipments/drafts endpoints.
+    where.isDraft = false;
+
     const [shipments, total] = await Promise.all([
       prisma.shipment.findMany({
         where,
         skip,
-        take: limit,
+        take: safeLimit,
         include: {
           user: {
             select: {
@@ -216,8 +386,8 @@ export const shipmentsService = {
       pagination: {
         total,
         page,
-        limit,
-        pages: Math.ceil(total / limit)
+        limit: safeLimit,
+        pages: Math.ceil(total / safeLimit)
       }
     };
   },
@@ -243,12 +413,45 @@ export const shipmentsService = {
       }
     });
   },
+
+  // Same as findById but resolves the route param as either a DB id or an AWB
+  // reference. Use this for all /:id routes (the frontend passes AWBs).
+  async findByIdOrReferenceFull(idOrReference: string) {
+    const base = await this.findByIdOrReference(idOrReference);
+    if (!base) return null;
+    return this.findById(base.id);
+  },
+
+  // Public tracking view: shipment + events, WITHOUT owner PII (name/email/
+  // phone/documents). Used by the unauthenticated /track/:awb endpoint.
+  async findTrackingByAwb(awb: string) {
+    const shipment = await prisma.shipment.findFirst({
+      where: { reference: awb, isDraft: false },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        trackingEvents: {
+          orderBy: { eventTime: 'desc' },
+          select: { id: true, status: true, location: true, description: true, eventTime: true },
+        },
+      },
+    });
+    if (!shipment) return null;
+    const { userId, ...rest } = shipment as any;
+    return rest;
+  },
   
   async update(id: string, data: any) {
-    const payload = { ...data };
-    if (payload && typeof payload.status === 'string') {
-      payload.status = validateAndConvertStatus(payload.status);
+    // Whitelist editable fields so clients cannot inject id/userId/isDraft or
+    // relation writes through the request body.
+    const picked = pickShipmentFields(data);
+    if (typeof picked.status === 'string') {
+      picked.status = validateAndConvertStatus(picked.status);
     }
+    if (picked.paymentType) {
+      const pt = normalizePaymentType(String(picked.paymentType));
+      if (pt) picked.paymentType = pt;
+    }
+    const payload: Record<string, any> = picked;
     if (payload.originCity) {
       const code = await prisma.airport.findFirst({ where: { city: { equals: String(payload.originCity).trim(), mode: 'insensitive' } } });
       if (code?.code) (payload as any).originAirportCode = code.code;
