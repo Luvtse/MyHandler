@@ -419,11 +419,15 @@ usersRouter.patch('/:id/toggle-status', requirePermission('user:update_all'), as
       return res.status(404).json({ error: 'User not found' });
     }
 
+    const newRole = user.role === 'customer' ? 'driver' : 'customer'; // Toggle between customer and driver roles
+
     const updated = await prisma.user.update({
       where: { id: req.params.id },
-      data: { role: user.role === 'customer' ? 'driver' : 'customer' }, // Toggle between customer and driver roles
+      data: { role: newRole },
       select: { id: true, role: true }
     });
+
+    auditUser(req, 'STATUS_CHANGE', updated.id, { field: 'role', from: user.role, to: newRole });
 
     res.json({ user: updated });
   } catch (error) {
@@ -433,11 +437,21 @@ usersRouter.patch('/:id/toggle-status', requirePermission('user:update_all'), as
 });
 usersRouter.patch('/:id/verify', requirePermission('user:update_all'), async (req, res) => {
   try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, role: true }
+    });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     const updated = await prisma.user.update({
       where: { id: req.params.id },
       data: { role: 'customer' }, // Set role to customer as verification
       select: { id: true, role: true }
     });
+
+    auditUser(req, 'STATUS_CHANGE', updated.id, { field: 'role', action: 'verify', from: user.role, to: 'customer' });
 
     res.json({ user: updated });
   } catch (error) {
@@ -447,8 +461,12 @@ usersRouter.patch('/:id/verify', requirePermission('user:update_all'), async (re
 });
 usersRouter.patch('/:id/role', requirePermission('user:assign_role'), async (req, res) => {
   try {
-    const { role } = req.body;
-    
+    const parsed = assignRoleSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid role', details: parsed.error.issues[0]?.message });
+    }
+    const { role } = parsed.data;
+
     const user = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -460,6 +478,8 @@ usersRouter.patch('/:id/role', requirePermission('user:assign_role'), async (req
       select: { id: true, role: true }
     });
 
+    auditUser(req, 'UPDATE', updated.id, { field: 'role', from: user.role, to: role });
+
     res.json({ user: updated });
   } catch (error) {
     console.error('Error assigning role:', error);
@@ -468,11 +488,11 @@ usersRouter.patch('/:id/role', requirePermission('user:assign_role'), async (req
 });
 usersRouter.post('/:id/reset-password', requirePermission('user:update_all'), async (req, res) => {
   try {
-    const { password } = req.body;
-    
-    if (!password || password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid password' });
     }
+    const { password } = parsed.data;
 
     const user = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!user) {
@@ -484,6 +504,9 @@ usersRouter.post('/:id/reset-password', requirePermission('user:update_all'), as
       where: { id: req.params.id },
       data: { password: hashed }
     });
+
+    // Never log the plaintext password — record only that an admin reset occurred.
+    auditUser(req, 'UPDATE', user.id, { field: 'password', action: 'admin_reset' });
 
     res.json({ message: 'Password reset successfully' });
   } catch (error) {

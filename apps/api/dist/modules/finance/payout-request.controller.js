@@ -1,0 +1,372 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.payoutRequestController = exports.PAYOUT_STAFF_ROLES = void 0;
+const authService_1 = require("../../services/authService");
+const prisma_1 = __importDefault(require("../../utils/prisma"));
+const emailService_1 = require("../../services/emailService");
+exports.PAYOUT_STAFF_ROLES = ['admin', 'finance', 'account_manager', 'cfo'];
+exports.payoutRequestController = {
+    // Create a new payout request
+    create: async (req, res) => {
+        try {
+            const { amount, currency, paymentMethod, bankAccount, mobileNumber, description } = req.body;
+            const userId = req.user?.sub;
+            if (!userId) {
+                return res.status(401).json({ success: false, error: 'Unauthorized: user missing' });
+            }
+            if (!amount || amount <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Amount must be greater than 0'
+                });
+            }
+            if (!paymentMethod) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Payment method is required'
+                });
+            }
+            if (!description) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Description is required'
+                });
+            }
+            if (paymentMethod === 'BANK_TRANSFER' && !bankAccount) {
+                return res.status(400).json({ success: false, error: 'Bank account is required for bank transfer' });
+            }
+            if (paymentMethod === 'MOBILE_MONEY' && !mobileNumber) {
+                return res.status(400).json({ success: false, error: 'Mobile number is required for mobile money' });
+            }
+            const payoutRequest = await prisma_1.default.payoutRequest.create({
+                data: {
+                    userId,
+                    amount,
+                    currency: currency || 'USD',
+                    paymentMethod,
+                    bankAccount,
+                    mobileNumber,
+                    description,
+                    requestedBy: String(userId),
+                    status: 'PENDING'
+                },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true
+                        }
+                    }
+                }
+            });
+            // Create notification for finance users
+            const financeUsers = await prisma_1.default.user.findMany({
+                where: { role: 'finance' },
+            });
+            for (const financeUser of financeUsers) {
+                await prisma_1.default.notification.create({
+                    data: {
+                        userId: financeUser.id,
+                        type: 'INFO',
+                        title: 'New Payout Request',
+                        message: `${payoutRequest.user.name} has requested a payout of ${payoutRequest.amount} ${payoutRequest.currency}`,
+                        actionUrl: '/dashboard/finance/payout-requests',
+                        actionText: 'Review Request',
+                    },
+                });
+                // Send email notification to finance users
+                await emailService_1.emailService.sendNotificationEmail(financeUser.id, 'PAYOUT_REQUEST', {
+                    amount: payoutRequest.amount,
+                    currency: payoutRequest.currency,
+                    paymentMethod: payoutRequest.paymentMethod,
+                    requestedBy: payoutRequest.user.name,
+                });
+            }
+            res.status(201).json({
+                success: true,
+                data: payoutRequest
+            });
+        }
+        catch (error) {
+            console.error('Error creating payout request:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to create payout request'
+            });
+        }
+    },
+    // Get all payout requests with optional filtering
+    getAll: async (req, res) => {
+        try {
+            const { status, userId, page = 1, limit = 10 } = req.query;
+            const skip = (Number(page) - 1) * Number(limit);
+            const where = {};
+            if (status) {
+                where.status = status;
+            }
+            // Ownership gate: non-staff users may only see their own requests.
+            const isStaff = await (0, authService_1.hasAnyRole)(req, exports.PAYOUT_STAFF_ROLES);
+            if (!isStaff) {
+                where.userId = req.user.sub;
+            }
+            else if (userId) {
+                where.userId = userId;
+            }
+            const [payoutRequests, total] = await Promise.all([
+                prisma_1.default.payoutRequest.findMany({
+                    where,
+                    skip,
+                    take: Number(limit),
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true
+                            }
+                        }
+                    },
+                    orderBy: {
+                        createdAt: 'desc'
+                    }
+                }),
+                prisma_1.default.payoutRequest.count({ where })
+            ]);
+            res.json({
+                success: true,
+                data: payoutRequests,
+                pagination: {
+                    page: Number(page),
+                    limit: Number(limit),
+                    total,
+                    pages: Math.ceil(total / Number(limit))
+                }
+            });
+        }
+        catch (error) {
+            console.error('Error fetching payout requests:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch payout requests'
+            });
+        }
+    },
+    // Get payout request by ID
+    getById: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const payoutRequest = await prisma_1.default.payoutRequest.findUnique({
+                where: { id },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true
+                        }
+                    }
+                }
+            });
+            if (!payoutRequest) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Payout request not found'
+                });
+            }
+            // Ownership gate: non-staff users may only view their own requests.
+            const canViewAll = await (0, authService_1.hasAnyRole)(req, exports.PAYOUT_STAFF_ROLES);
+            if (!canViewAll && payoutRequest.userId !== req.user.sub) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'You do not have permission to view this payout request'
+                });
+            }
+            res.json({
+                success: true,
+                data: payoutRequest
+            });
+        }
+        catch (error) {
+            console.error('Error fetching payout request:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch payout request'
+            });
+        }
+    },
+    // Update payout request status (approve/reject/process)
+    updateStatus: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { status, rejectionReason, notes } = req.body;
+            const userId = req.user.sub;
+            // Only payout staff (primary or DB secondary role) may transition statuses.
+            const isStaff = await (0, authService_1.hasAnyRole)(req, exports.PAYOUT_STAFF_ROLES);
+            if (!isStaff) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'You do not have permission to update payout request status'
+                });
+            }
+            const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'PROCESSING', 'COMPLETED', 'CANCELLED'];
+            if (!validStatuses.includes(status)) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid status'
+                });
+            }
+            const existingRequest = await prisma_1.default.payoutRequest.findUnique({
+                where: { id }
+            });
+            if (!existingRequest) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Payout request not found'
+                });
+            }
+            // Status-machine gates: block illegal/skip transitions and self-approval.
+            const ALLOWED_TRANSITIONS = {
+                PENDING: ['APPROVED', 'REJECTED', 'CANCELLED'],
+                APPROVED: ['PROCESSING', 'CANCELLED'],
+                REJECTED: [],
+                PROCESSING: ['COMPLETED'],
+                COMPLETED: [],
+                CANCELLED: [],
+            };
+            const allowedNext = ALLOWED_TRANSITIONS[existingRequest.status] ?? [];
+            if (status !== existingRequest.status && !allowedNext.includes(status)) {
+                return res.status(400).json({
+                    success: false,
+                    error: `Invalid status transition: ${existingRequest.status} -> ${status}`
+                });
+            }
+            if ((status === 'APPROVED' || status === 'REJECTED') && existingRequest.userId === userId) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'You cannot approve or reject your own payout request'
+                });
+            }
+            const updateData = {
+                status,
+                notes: notes || existingRequest.notes
+            };
+            if (status === 'APPROVED' || status === 'REJECTED') {
+                updateData.approvedBy = userId;
+                updateData.approvedAt = new Date();
+            }
+            if (status === 'PROCESSING' || status === 'COMPLETED') {
+                updateData.processedBy = userId;
+                updateData.processedAt = new Date();
+            }
+            if (rejectionReason) {
+                updateData.rejectionReason = rejectionReason;
+            }
+            const updatedRequest = await prisma_1.default.payoutRequest.update({
+                where: { id },
+                data: updateData,
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true
+                        }
+                    }
+                }
+            });
+            // Create notification for user
+            const statusMessages = {
+                APPROVED: 'Your payout request has been approved',
+                REJECTED: 'Your payout request has been rejected',
+                PROCESSING: 'Your payout request is being processed',
+                COMPLETED: 'Your payout request has been completed'
+            };
+            if (statusMessages[status]) {
+                const typeMap = {
+                    APPROVED: 'SUCCESS',
+                    COMPLETED: 'SUCCESS',
+                    REJECTED: 'ERROR',
+                    PROCESSING: 'INFO',
+                    PENDING: 'INFO',
+                    CANCELLED: 'WARNING',
+                };
+                await prisma_1.default.notification.create({
+                    data: {
+                        userId: updatedRequest.userId,
+                        type: typeMap[status] || 'INFO',
+                        title: `Payout Request ${status}`,
+                        message: statusMessages[status],
+                        actionUrl: '/dashboard/finance/payout-requests',
+                        actionText: 'View Details',
+                    },
+                });
+                // Send email notification to user
+                await emailService_1.emailService.sendNotificationEmail(updatedRequest.userId, 'PAYOUT_STATUS', {
+                    status,
+                    amount: updatedRequest.amount,
+                    currency: updatedRequest.currency,
+                    paymentMethod: updatedRequest.paymentMethod,
+                    notes: updatedRequest.notes,
+                });
+            }
+            res.json({
+                success: true,
+                data: updatedRequest
+            });
+        }
+        catch (error) {
+            console.error('Error updating payout request status:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to update payout request status'
+            });
+        }
+    },
+    // Delete payout request (only if pending)
+    delete: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const existingRequest = await prisma_1.default.payoutRequest.findUnique({
+                where: { id }
+            });
+            if (!existingRequest) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Payout request not found'
+                });
+            }
+            // Only the owner or payout staff may delete.
+            const isStaff = await (0, authService_1.hasAnyRole)(req, exports.PAYOUT_STAFF_ROLES);
+            if (!isStaff && existingRequest.userId !== req.user.sub) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'You do not have permission to delete this payout request'
+                });
+            }
+            if (existingRequest.status !== 'PENDING') {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Can only delete pending payout requests'
+                });
+            }
+            await prisma_1.default.payoutRequest.delete({
+                where: { id }
+            });
+            res.json({
+                success: true,
+                message: 'Payout request deleted successfully'
+            });
+        }
+        catch (error) {
+            console.error('Error deleting payout request:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to delete payout request'
+            });
+        }
+    }
+};
