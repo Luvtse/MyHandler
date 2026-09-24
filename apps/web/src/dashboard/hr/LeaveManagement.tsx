@@ -1,57 +1,76 @@
 // src/dashboard/hr/LeaveManagement.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+// NOTE: This component intentionally avoids TanStack Query so it can be mounted
+// inside a plain client bundle (see LeaveRequestList). Keep fetch logic here in
+// sync with src/hooks/useLeaveRequests.ts (unwrapApiResponse semantics).
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
 import { Button } from '@/shared/ui/Button';
 import { Badge } from '@/shared/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/Tabs';
-import { 
-  Calendar, 
-  Clock, 
-  CheckCircle, 
+import {
+  Calendar,
+  Clock,
+  CheckCircle,
   XCircle,
   Plus,
   BarChart3,
 } from 'lucide-react';
 import { useAuth } from '@/features/auth/hooks';
 import { apiService } from '@/lib/api/client';
+import { API_ENDPOINTS } from '@/lib/api/endpoints';
 import { toast } from 'sonner';
+import { LeaveApprovalModal } from '@/dashboard/hr/LeaveApprovalModal';
 
-interface LeaveRequest {
+export interface LeaveRequest {
   id: string;
-  employee: {
-    user: {
-      name: string;
-    };
+  employee?: {
+    id?: string;
+    userId?: string;
+    user?: { id?: string; name?: string; email?: string };
   };
   leaveType: string;
   startDate: string;
   endDate: string;
   totalDays: number;
+  reason?: string;
+  emergencyContact?: string;
   status: string;
   managerApproval: string;
   hrApproval: string;
-  manager: {
-    id: string;
-  };
+  managerId?: string;
+  manager?: { id?: string; userId?: string; user?: { id?: string; name?: string } | null };
+  backupEmployee?: { id?: string; firstName?: string; lastName?: string } | null;
 }
+
+// The API returns { status: 'success', leaves: [...], pagination } — NOT `.data`.
+// Mirrors unwrapApiResponse() in src/hooks/useLeaveRequests.ts.
+export function extractLeaves(payload: any): LeaveRequest[] {
+  const body = payload?.data ?? payload;
+  if (Array.isArray(body)) return body;
+  if (Array.isArray(body?.leaves)) return body.leaves;
+  if (Array.isArray(body?.data?.leaves)) return body.data.leaves;
+  return [];
+}
+
+const PAGE_LIMIT = 100;
 
 const LeaveManagement = () => {
   const { user } = useAuth();
-  
-  // ✅ ALL HOOKS AT TOP LEVEL - NO CONDITIONAL HOOKS
+
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
+  const [approvalRole, setApprovalRole] = useState<'manager' | 'hr'>('hr');
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('all');
 
-  // ✅ Calculate stats and filtered data with useMemo (not useState)
   const leaveStats = useMemo(() => {
     const pending = leaveRequests.filter(l => l.status === 'PENDING').length;
     const approved = leaveRequests.filter(l => l.status === 'APPROVED').length;
     const rejected = leaveRequests.filter(l => l.status === 'REJECTED').length;
-    
+
     return {
       pendingRequests: pending,
       approvedRequests: approved,
@@ -73,29 +92,32 @@ const LeaveManagement = () => {
     }
   }, [activeTab, leaveRequests]);
 
-  // Fetch leave data
-  useEffect(() => {
-    const loadLeaveData = async () => {
-      try {
-        setLoading(true);
-        const response = await apiService.request({
-          method: 'GET',
-          url: '/hr/leave-requests'
-        });
-        
-        if (response.success) {
-          const leaves = Array.isArray(response.data) ? response.data : [];
-          setLeaveRequests(leaves);
-        }
-      } catch (err) {
-        toast.error('Failed to load leave requests');
-      } finally {
-        setLoading(false);
+  // Fetch leave data (server defaults to limit=10 — request an explicit page size
+  // and read `.leaves` from the { status, leaves, pagination } envelope).
+  const loadLeaveData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setLoadError(null);
+      const response = await apiService.get(API_ENDPOINTS.hr.leaveRequests.list, {
+        params: { page: 1, limit: PAGE_LIMIT },
+      });
+
+      if (!response.success) {
+        throw new Error(response.error?.message || 'Failed to load leave requests');
       }
-    };
-    
-    loadLeaveData();
+
+      setLeaveRequests(extractLeaves(response.data));
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Failed to load leave requests');
+      toast.error('Failed to load leave requests');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadLeaveData();
+  }, [loadLeaveData]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
@@ -131,28 +153,56 @@ const LeaveManagement = () => {
     );
   };
 
-  const handleApprove = (leave: LeaveRequest) => {
-    setSelectedLeave(leave);
-    setShowApprovalModal(true);
-  };
-
-  const handleReject = (leave: LeaveRequest) => {
-    setSelectedLeave(leave);
-    setShowApprovalModal(true);
-  };
-
+  // Manager approval is only allowed for the assigned manager, compared by user ID
+  // (never by display name), and never on one's own request.
   const canApproveAsManager = (leave: LeaveRequest) => {
-    return !!user && 
-           leave.managerApproval === 'PENDING' && 
-           leave.manager && leave.manager.id === user.id &&
-
-           leave.employee.user.name !== user?.name;
+    return !!user &&
+           leave.managerApproval === 'PENDING' &&
+           leave.status === 'PENDING' &&
+           !!leave.manager?.user?.id &&
+           leave.manager.user.id === user.id &&
+           leave.employee?.userId !== user.id;
   };
 
   const canApproveAsHr = (leave: LeaveRequest) => {
     return !!user && (user.role === 'hr_manager' || user.role === 'hr_staff') &&
-           leave.managerApproval === 'APPROVED' && 
+           leave.managerApproval === 'APPROVED' &&
            leave.hrApproval === 'PENDING';
+  };
+
+  const openApprovalModal = (leave: LeaveRequest) => {
+    setSelectedLeave(leave);
+    // HR takes precedence only when the HR stage is actually actionable;
+    // otherwise fall back to the manager stage so it is never skipped.
+    setApprovalRole(canApproveAsHr(leave) ? 'hr' : 'manager');
+    setShowApprovalModal(true);
+  };
+
+  const handleDecision = async (status: 'APPROVED' | 'REJECTED', comments: string) => {
+    if (!selectedLeave) return;
+    try {
+      const url = approvalRole === 'hr'
+        ? API_ENDPOINTS.hr.leaveRequests.approve.hr(selectedLeave.id)
+        : API_ENDPOINTS.hr.leaveRequests.approve.manager(selectedLeave.id);
+
+      // The API schema expects { status, comments } — not `approvalStatus`.
+      const response = await apiService.patch(url, { status, comments });
+
+      if (!response.success) {
+        throw new Error(
+          response.error?.message ||
+          response.data?.error ||
+          'Failed to update leave request'
+        );
+      }
+
+      toast.success(`Leave request ${status.toLowerCase()} successfully`);
+      setShowApprovalModal(false);
+      setSelectedLeave(null);
+      await loadLeaveData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update leave request');
+    }
   };
 
   if (loading) {
@@ -215,6 +265,13 @@ const LeaveManagement = () => {
         </Card>
       </div>
 
+      {loadError && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          {loadError}{' '}
+          <button className="underline" onClick={loadLeaveData}>Retry</button>
+        </div>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="all">All Requests</TabsTrigger>
@@ -262,11 +319,8 @@ const LeaveManagement = () => {
                         
                         {(canApproveAsManager(leave) || canApproveAsHr(leave)) && (
                           <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleReject(leave)}>
-                              Reject
-                            </Button>
-                            <Button size="sm" onClick={() => handleApprove(leave)}>
-                              Approve
+                            <Button size="sm" variant="outline" onClick={() => openApprovalModal(leave)}>
+                              Review
                             </Button>
                           </div>
                         )}
@@ -280,60 +334,19 @@ const LeaveManagement = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Approval Modal */}
-      {showApprovalModal && selectedLeave && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">
-              Approve Leave Request
-            </h3>
-            <p className="mb-4">
-              Are you sure you want to approve this leave request for {selectedLeave.employee?.user?.name}?
-            </p>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setShowApprovalModal(false)}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={async () => {
-                  try {
-                    const isHr = user?.role === 'hr_manager' || user?.role === 'hr_staff';
-                    
-                    if (isHr) {
-                      await apiService.request({
-                        method: 'PATCH',
-                        url: `/hr/leave-requests/${selectedLeave.id}/hr-approval`,
-                        data: { approvalStatus: 'APPROVED', comments: '' }
-                      });
-                    } else {
-                      await apiService.request({
-                        method: 'PATCH',
-                        url: `/hr/leave-requests/${selectedLeave.id}/manager-approval`,
-                        data: { approvalStatus: 'APPROVED', comments: '' }
-                      });
-                    }
-                    
-                    toast.success('Leave request approved successfully');
-                    setShowApprovalModal(false);
-                    // Refresh data
-                    const response = await apiService.request({
-                      method: 'GET',
-                      url: '/hr/leave-requests'
-                    });
-                    if (response.success) {
-                      setLeaveRequests(Array.isArray(response.data) ? response.data : []);
-                    }
-                  } catch (err) {
-                    toast.error('Failed to approve leave request');
-                  }
-                }}
-              >
-                Approve
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Approval Modal (Radix Dialog: focus trap, ESC, backdrop) */}
+      <LeaveApprovalModal
+        leave={selectedLeave ? toModalLeave(selectedLeave) : null}
+        isOpen={showApprovalModal}
+        onClose={() => {
+          setShowApprovalModal(false);
+          setSelectedLeave(null);
+        }}
+        onApprove={(_id, comments) => handleDecision('APPROVED', comments)}
+        onReject={(_id, comments) => handleDecision('REJECTED', comments)}
+        isLoading={false}
+        userRole={approvalRole}
+      />
     </div>
   );
 };
