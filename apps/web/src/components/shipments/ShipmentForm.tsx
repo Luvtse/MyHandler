@@ -536,7 +536,7 @@ export const ShipmentForm: React.FC<ShipmentFormProps> = ({
         });
         result = resp.data || resp;
       } else {
-        // Create new shipment directly
+        // Shared mapping from form data to the backend shipment shape.
         const backendShipmentData = {
           originAddress: data.sender?.address1,
           originCompany: data.sender?.company,
@@ -547,8 +547,8 @@ export const ShipmentForm: React.FC<ShipmentFormProps> = ({
           destinationCity: data.recipient?.city,
           destinationCountry: data.recipient?.country,
           weightKg: totalWeight,
-          dimensionsCm: data.packageDetails ? 
-            `${data.packageDetails.length}x${data.packageDetails.width}x${data.packageDetails.height}` : 
+          dimensionsCm: data.packageDetails ?
+            `${data.packageDetails.length}x${data.packageDetails.width}x${data.packageDetails.height}` :
             undefined,
           serviceLevel: data.serviceType,
           notes: data.specialInstructions,
@@ -556,13 +556,46 @@ export const ShipmentForm: React.FC<ShipmentFormProps> = ({
           chargesCurrency: chargesCurrency,
           paymentType: String(paymentType || '').toUpperCase(),
           accountNumber: paymentType === 'account' ? manualAccountNumber : undefined,
-          status: 'order_received',
         };
 
+        if (isEditMode) {
+          // Real update path: PUT to the existing shipment (the server resolves
+          // targetShipmentId as either a DB id or an AWB reference). This must
+          // NOT fall through to POST /shipments, which would create a duplicate.
+          if (!targetShipmentId) {
+            toast({
+              title: 'Cannot Save Changes',
+              description: 'The shipment identifier is missing. Reload the page and try again.',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          const resp = await apiRequestData<any>({
+            method: 'PUT',
+            url: API_ENDPOINTS.shipments.update(targetShipmentId),
+            data: backendShipmentData,
+          });
+          result = resp.data || resp;
+
+          if (result) {
+            setCreatedAwb(result.reference || result.awbNumber);
+            toast({
+              title: 'Shipment Updated',
+              description: 'Your changes have been saved successfully.',
+              variant: 'default',
+            });
+            if (onSubmitSuccess) onSubmitSuccess(result);
+            if (onSuccess) onSuccess(result.reference || result.awbNumber);
+          }
+          return;
+        }
+
+        // Create new shipment directly
         const resp = await apiRequestData<any>({
           method: 'POST',
           url: API_ENDPOINTS.shipments.create,
-          data: backendShipmentData,
+          data: { ...backendShipmentData, status: 'order_received' },
         });
         result = resp.data || resp;
       }
