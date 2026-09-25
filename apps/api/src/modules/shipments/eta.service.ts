@@ -208,18 +208,22 @@ export const etaService = {
     const originHub = (await pickHubFor(origin.countryCode)) || 'ADD';
     const destHub = (await pickHubFor(dest.countryCode)) || 'ADD';
     const viaHub = origin.code.toLowerCase() !== dest.code.toLowerCase() && (origin.code.toLowerCase() !== destHub.toLowerCase() || dest.code.toLowerCase() !== originHub.toLowerCase());
+    console.log('PROBE pre-hub', JSON.stringify({start:start.toISOString(), procStart:procStart.toISOString(), originReady:originReady.toISOString()}));
     const flights: any[] = [];
     let arrival: Date | null = null;
+    console.log('PROBE viaHub=', viaHub, originHub, destHub);
     if (viaHub) {
       const originHubCity = (airportsData.find(a => a.code === originHub) as any)?.city || '';
       const destHubCity = (airportsData.find(a => a.code === destHub) as any)?.city || '';
       let leg1Dep = nextFlightTimeByCodes(schedulesData, origin.code, originHub, originReady) || nextFlightTimeByCities(schedulesData, origin.city, originHubCity, originReady);
+      console.log('PROBE leg1Dep=', leg1Dep ? leg1Dep.toISOString() : null);
       if (!leg1Dep) return { estimatedDelivery: '', steps: [], totalHours: 0, totalDays: 0, flights: [] };
       const leg1Mins = (findScheduleByCodes(schedulesData, origin.code, originHub)?.flightMinutes || findScheduleByCities(schedulesData, origin.city, originHubCity)?.flightMinutes || 90);
       const leg1Arr = addFlightMinutesWithTimezone(leg1Dep, leg1Mins, (origin as any).timezone, (airportsData.find(a => a.code === originHub) as any)?.timezone || 'UTC');
       const international = String(origin.countryCode || '').toUpperCase() !== String(dest.countryCode || '').toUpperCase();
       const hubLayover = international ? 3 : 1;
       const leg2Ready = addHours(leg1Arr, hubLayover);
+      console.log('XPROBE leg2 inputs', originHub, destHub, leg2Ready.toISOString(), 'rows', schedulesData.length, JSON.stringify(schedulesData[0]));
       let leg2Dep = nextFlightTimeByCodes(schedulesData, originHub, destHub, leg2Ready) || nextFlightTimeByCities(schedulesData, originHubCity, destHubCity, leg2Ready);
       if (!leg2Dep) return { estimatedDelivery: '', steps: [], totalHours: 0, totalDays: 0, flights: [] };
       const leg2Mins = (findScheduleByCodes(schedulesData, originHub, destHub)?.flightMinutes || 180);
