@@ -18,6 +18,10 @@ vi.mock('../../../utils/prisma', () => ({ default: prismaMock }));
 import { etaService } from '../eta.service';
 import { AIRPORTS, SCHEDULES, SL_SETTINGS, REGIONAL_HUBS, calendarRow } from './etaFixtures';
 
+// NOTE: the service re-reads every config table on each internal lookup, so a
+// single calculateETA() issues dozens of findMany calls. Use persistent
+// mockResolvedValue (NOT *Once) for fixtures; tests that need custom behavior
+// override with mockImplementation in the test body.
 beforeEach(() => {
   prismaMock.airport.findMany.mockResolvedValue(AIRPORTS);
   prismaMock.flightSchedule.findMany.mockResolvedValue(SCHEDULES);
