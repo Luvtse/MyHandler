@@ -52,7 +52,7 @@ async function getServiceLevelSettings() {
   } catch { return {}; }
 }
 
-async function isHoliday(date: Date, city?: string, airportCode?: string, countryCode?: string) {
+export async function isHoliday(date: Date, city?: string, airportCode?: string, countryCode?: string) {
   try {
     const start = new Date(date); start.setHours(0,0,0,0);
     const end = new Date(date); end.setHours(23,59,59,999);
@@ -130,7 +130,10 @@ function cutoffHour(sl: string, airportType: string) {
   return t === 'hub' ? 13 : t === 'regional' ? 12 : 11;
 }
 
-function nextWeekday(dt: Date, businessStart: number) {
+// NOTE (characterization): nextWeekday only skips Sat/Sun; it does NOT consult
+// OperatingCalendar. Holiday handling is a separate, single-shot shift applied
+// only to the final delivery timestamp (see calculateETA). Exported for tests.
+export function nextWeekday(dt: Date, businessStart: number) {
   const d = new Date(dt);
   const day = d.getDay();
   if (day === 0) { // Sunday → Monday

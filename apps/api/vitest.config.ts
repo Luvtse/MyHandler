@@ -14,6 +14,9 @@ export default defineConfig({
     environment: 'node',
     include: ['**/*.test.ts'],
     exclude: ['node_modules'],
-    globals: true
+    globals: true,
+    // ETA code mixes naive Date math with local-time semantics; pin TZ so
+    // characterization/golden tests are deterministic across machines/CI.
+    env: { TZ: 'UTC' }
   }
 });
